@@ -1,4 +1,4 @@
-const MatchList = ({ matches }) => {
+const MatchList = ({ matches, onSelectMatch }) => {
   return (
     <div className="card border-0 shadow-sm rounded-4 overflow-hidden bg-white">
       <div className="card-header bg-white border-0 pt-3 pb-0">
@@ -14,13 +14,14 @@ const MatchList = ({ matches }) => {
 
       <div className="card-body p-2">
         <div className="d-flex flex-column gap-2">
-          {matches.map((match) => (
+          {matches.map((match, index) => (
             <div
-              key={match.id}
+              key={`${match.id}-${index}`}
+              onClick={() => onSelectMatch && onSelectMatch(match)}
               className="d-flex align-items-center p-2 rounded-3"
               style={{
                 background: "#f8fbfb",
-                transition: "backgroud-color 0.2s",
+                transition: "background-color 0.2s",
                 cursor: "pointer",
               }}
               onMouseOver={(e) =>
@@ -40,6 +41,10 @@ const MatchList = ({ matches }) => {
                     height: "55px",
                     objectFit: "cover",
                     borderColor: "#7FBCC8",
+                  }}
+                  onError={(e) => {
+                    console.log("Errore immagine MatchList per:", match.name);
+                    e.target.src = "https://via.placeholder.com/150";
                   }}
                 />
 
