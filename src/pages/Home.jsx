@@ -34,7 +34,16 @@ const FilterPill = ({ options, current, onChange }) => (
     </div>
 );
 
-const Home = ({ dogs, loading, breed, setBreed, setSelectedDog, handleAcceptMatch, handleRejectDog, user,
+const emptyMessage = (breed, setBreed, feedError) => {
+    if (breed) return (
+        <>Nessun risultato per <strong>{breed}</strong>. Prova a cambiare razza o <button className="btn btn-link btn-sm p-0" onClick={() => setBreed("")}>mostra tutti</button>.</>
+    );
+    if (feedError === "nessun_cane") return "Aggiungi prima il tuo cane dal profilo per vedere il feed.";
+    if (feedError === "errore_server") return "Errore di connessione al server. Riprova più tardi.";
+    return "Hai già visto tutti i cani disponibili. Torna più tardi!";
+};
+
+const Home = ({ dogs, loading, feedError, breed, setBreed, setSelectedDog, handleAcceptMatch, handleRejectDog, user,
                 filtroIntento, setFiltroIntento, filtroDistanza, setFiltroDistanza }) => {
 
     return (
@@ -58,20 +67,16 @@ const Home = ({ dogs, loading, breed, setBreed, setSelectedDog, handleAcceptMatc
             </div>
 
             <h4 className="fw-bold mb-4">Consigliati per te</h4>
-            
+
             {loading ? (
                 <div className="text-center py-5">
                     <div className="spinner-border text-success"></div>
                 </div>
             ) : dogs.length === 0 ? (
                 <div className="text-center py-5 text-muted">
-                    <i className="bi bi-search d-block mb-3" style={{ fontSize: "3rem", opacity: 0.3 }} />
+                    <i className={`bi ${feedError === "errore_server" ? "bi-wifi-off" : "bi-search"} d-block mb-3`} style={{ fontSize: "3rem", opacity: 0.3 }} />
                     <p className="fw-semibold mb-1">Nessun cane trovato</p>
-                    <p className="small">
-                        {breed
-                            ? <>Nessun risultato per <strong>{breed}</strong>. Prova a cambiare razza o <button className="btn btn-link btn-sm p-0" onClick={() => setBreed("")}>mostra tutti</button>.</>
-                            : "Hai già visto tutti i cani disponibili. Torna più tardi!"}
-                    </p>
+                    <p className="small">{emptyMessage(breed, setBreed, feedError)}</p>
                 </div>
             ) : (
                 <div className="row g-4">

@@ -17,11 +17,13 @@ import RichiesteMatch from "./pages/RichiesteMatch";
 import SnoutBot from "./components/SnoutBot";
 import { dogService } from "./services/dogServices";
 import { inviaLike, inviaDislike, getRichiesteRicevute, rifiutaRichiesta } from "./services/interazioneServices";
+import { getSocket, disconnectSocket } from "./services/socketService";
 
 
 function App() {
   const [dogs, setDogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [feedError, setFeedError] = useState(null);
   const [breed, setBreed] = useState("");
   const [selectedDog, setSelectedDog] = useState(null);
   const [filtroIntento, setFiltroIntento] = useState("");
@@ -36,6 +38,8 @@ function App() {
     richieste: 0,
   });
   const [richieste, setRichieste] = useState([]);
+  const [msgNotifiche, setMsgNotifiche] = useState({});
+  const [selectedMatchToOpen, setSelectedMatchToOpen] = useState(null);
   const pollingRef = useRef(null);
 
   // 1. Controllo sessione all'avvio
@@ -130,6 +134,7 @@ function App() {
 
   // 3. Gestione Logout
   const handleLogout = () => {
+    disconnectSocket();
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('dogMatches');
@@ -137,49 +142,82 @@ function App() {
     setCurrentPage('landing');
   };
 
+  // Socket: notifiche messaggi in tempo reale
+  useEffect(() => {
+    if (!user) return;
+    const socket = getSocket();
+    const handler = ({ interazioneId }) => {
+      setMsgNotifiche(prev => ({ ...prev, [interazioneId]: (prev[interazioneId] || 0) + 1 }));
+      setNotifications(prev => ({ ...prev, messages: prev.messages + 1 }));
+    };
+    socket.on('nuova_notifica_messaggio', handler);
+    return () => socket.off('nuova_notifica_messaggio', handler);
+  }, [user]);
+
+  const clearMsgNotifica = (interazioneId) => {
+    setMsgNotifiche(prev => {
+      const next = { ...prev };
+      delete next[interazioneId];
+      return next;
+    });
+    setNotifications(prev => ({ ...prev, messages: Math.max(0, prev.messages - 1) }));
+  };
+
+  // Apri una specifica chat navigando verso messages
+  const apriChat = (match) => {
+    setSelectedMatchToOpen(match);
+    setCurrentPage("messages");
+  };
+
+  // Azzera il badge messaggi quando si entra nella pagina messages
+  useEffect(() => {
+    if (currentPage === "messages") {
+      setNotifications(prev => ({ ...prev, messages: 0 }));
+    }
+  }, [currentPage]);
+
   // 4. Caricamento Feed dal Database
   useEffect(() => {
     const caricaFeedReale = async () => {
-      // 1. Se non siamo in home o l'utente non c'è, fermati
       if (currentPage !== "home" || !user) return;
 
       setLoading(true);
+      setFeedError(null);
       try {
-
         const caniUtente = user.iMieiCani || user.cani || [];
-        console.log("Dati utente attuale:", user);
         const mioCaneId = caniUtente.length > 0 ? caniUtente[0].id : null;
 
         if (!mioCaneId) {
-          console.log("Nessun cane trovato per questo utente");
           setDogs([]);
+          setFeedError("nessun_cane");
           setLoading(false);
           return;
         }
 
         const response = await dogService.getDiscovery(mioCaneId, { intento: filtroIntento, distanza: filtroDistanza });
-        // Assicuriamoci di prendere i dati corretti sia che usiamo fetch o axios
         const data = response.data || response;
 
         if (data.successo && data.cani) {
           const caniFormattati = data.cani.map(dog => {
             const rawFile = dog.fotoUrl || dog.foto_url || "";
             const nomeFile = rawFile.replace('uploads/', '').replace('/uploads/', '');
-
             return {
               ...dog,
               name: dog.nome,
-              photo: nomeFile
-                ? `/uploads/${nomeFile}`
-                : "https://via.placeholder.com/400",
+              photo: nomeFile ? `/uploads/${nomeFile}` : "https://via.placeholder.com/400",
               breed: dog.razza,
               distance: Math.floor(Math.random() * 20) + 1
             };
           });
           setDogs(caniFormattati);
+        } else {
+          setDogs([]);
+          setFeedError(data.errore || "errore_generico");
         }
       } catch (err) {
         console.error("Errore caricamento feed:", err);
+        setDogs([]);
+        setFeedError("errore_server");
       } finally {
         setLoading(false);
       }
@@ -366,6 +404,7 @@ function App() {
                   <Home
                     dogs={breed ? dogs.filter(d => d.razza?.toLowerCase().includes(breed.toLowerCase())) : dogs}
                     loading={loading}
+                    feedError={feedError}
                     breed={breed}
                     setBreed={setBreed}
                     setSelectedDog={setSelectedDog}
@@ -389,7 +428,11 @@ function App() {
                         {state.matches.length === 0 ? (
                           <p className="text-muted mb-0 small text-center py-4">Ancora nessun match</p>
                         ) : (
-                          <MatchList matches={state.matches} />
+                          <MatchList
+                            matches={state.matches}
+                            msgNotifiche={msgNotifiche}
+                            onSelectMatch={apriChat}
+                          />
                         )}
                       </div>
                     </div>
@@ -399,7 +442,13 @@ function App() {
             )}
 
             {currentPage === "messages" && (
-              <Messaggi matches={state.matches} onBack={() => setCurrentPage('home')} />
+              <Messaggi
+                matches={state.matches}
+                onBack={() => { setCurrentPage('home'); setSelectedMatchToOpen(null); }}
+                msgNotifiche={msgNotifiche}
+                clearMsgNotifica={clearMsgNotifica}
+                initialMatch={selectedMatchToOpen}
+              />
             )}
           </main>
 
