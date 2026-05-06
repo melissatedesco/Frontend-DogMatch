@@ -9,6 +9,7 @@ import AdminPanel from "./pages/AdminPanel";
 import PrimaPagina from "./pages/PrimaPage";
 import Login from "./pages/Login";
 import Registrazione from "./pages/Registrazione";
+import BannedPage from "./pages/BannedPage";
 import Footer from "./components/Footer";
 import Home from "./pages/Home";
 import Messaggi from "./pages/Messaggi";
@@ -23,6 +24,8 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [breed, setBreed] = useState("");
   const [selectedDog, setSelectedDog] = useState(null);
+  const [filtroIntento, setFiltroIntento] = useState("");
+  const [filtroDistanza, setFiltroDistanza] = useState("");
   const [showMatchAlert, setShowMatchAlert] = useState(false);
   const [currentPage, setCurrentPage] = useState("landing");
   const [user, setUser] = useState(null); // Parte come null
@@ -79,15 +82,24 @@ function App() {
         .then(r => r.json())
         .then(data => {
           if (data.successo && data.matches) {
-            const formattati = data.matches.map(dog => {
-              const rawFile = dog.fotoUrl ?? dog.foto_url ?? "";
-              const nomeFile = rawFile.replace('uploads/', '').replace('/uploads/', '');
-              return {
-                ...dog,
-                name: dog.nome,
-                photo: nomeFile ? `/uploads/${nomeFile}` : "https://via.placeholder.com/400",
-              };
-            });
+            const formattati = data.matches
+              .map(interazione => {
+                // interazione ha mittente e ricevente — prendiamo il cane dell'altro
+                const altroCane = interazione.mittenteCaneId === caneId
+                  ? interazione.ricevente
+                  : interazione.mittente;
+                if (!altroCane) return null;
+                const rawFile = altroCane.fotoUrl ?? "";
+                const nomeFile = rawFile.replace('uploads/', '').replace('/uploads/', '');
+                return {
+                  ...altroCane,
+                  interazioneId: interazione.id,
+                  name: altroCane.nome,
+                  nomeCaneDestinatario: altroCane.nome,
+                  photo: nomeFile ? `/uploads/${nomeFile}` : "https://via.placeholder.com/400",
+                };
+              })
+              .filter(Boolean);
             dispatch({ type: "CARICA_MATCHES", payload: formattati });
           }
         })
@@ -145,7 +157,7 @@ function App() {
           return;
         }
 
-        const response = await dogService.getDiscovery(mioCaneId);
+        const response = await dogService.getDiscovery(mioCaneId, { intento: filtroIntento, distanza: filtroDistanza });
         // Assicuriamoci di prendere i dati corretti sia che usiamo fetch o axios
         const data = response.data || response;
 
@@ -174,7 +186,7 @@ function App() {
     };
 
     caricaFeedReale();
-  }, [currentPage, user]);
+  }, [currentPage, user, filtroIntento, filtroDistanza]);
 
   // 5. Reducer per i Match
   const initialState = {
@@ -197,15 +209,17 @@ function App() {
       return;
     }
 
-    // Controllo compatibilità razza
-    const userBreed = user.iMieiCani?.[0]?.razza || "Meticcio";
-    if (selectedDogData.razza.toUpperCase() !== userBreed.toUpperCase()) {
-      alert(`RAZZA NON COMPATIBILE\n\nPuoi fare match solo con esemplari di razza ${userBreed}`);
-      return;
+    // Controllo compatibilità razza solo per accoppiamento
+    if (filtroIntento === 'accoppiamento') {
+      const userBreed = user.iMieiCani?.[0]?.razza || "Meticcio";
+      if ((selectedDogData.razza ?? '').toUpperCase() !== userBreed.toUpperCase()) {
+        alert(`RAZZA NON COMPATIBILE\n\nPer l'accoppiamento puoi fare match solo con esemplari di razza ${userBreed}`);
+        return;
+      }
     }
 
     try {
-      const result = await inviaLike(mioCaneId, dogId);
+      const result = await inviaLike(mioCaneId, dogId, filtroIntento || 'gioco');
 
       if (!result.successo) return;
 
@@ -292,11 +306,9 @@ function App() {
     localStorage.setItem("dogMatches", JSON.stringify(state.matches));
   }, [state.matches]);
 
-  // logica di blocco 
-  if (user && (user.status === 'banned' || user.isBanned)) {
-    return (
-      <BannedPage user={user} onLogout={handleLogout} />
-    )
+  // logica di blocco
+  if (user && user.isBanned) {
+    return <BannedPage user={user} onLogout={handleLogout} />;
   }
 
   return (
@@ -333,7 +345,7 @@ function App() {
               />
             )}
 
-            {currentPage === "admin" && user?.isAdmin && (
+            {currentPage === "admin" && user?.ruolo === 'admin' && (
               <AdminPanel onBack={() => setCurrentPage("home")} />
             )}
 
@@ -360,6 +372,10 @@ function App() {
                     handleAcceptMatch={handleAcceptMatch}
                     handleRejectDog={handleRejectDog}
                     user={user}
+                    filtroIntento={filtroIntento}
+                    setFiltroIntento={setFiltroIntento}
+                    filtroDistanza={filtroDistanza}
+                    setFiltroDistanza={setFiltroDistanza}
                   />
                 </div>
 

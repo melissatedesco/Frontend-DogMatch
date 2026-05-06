@@ -49,7 +49,7 @@ const Navbar = ({ user, onLogout, notifications, richieste = [], onNavigate }) =
           </a>
 
           {/* Admin */}
-          {user?.isAdmin && (
+          {user?.ruolo === 'admin' && (
             <a href="#" className="text-decoration-none" title="Pannello Moderatore"
               onClick={(e) => { e.preventDefault(); onNavigate("admin"); }}>
               <i className="bi bi-shield-lock-fill" style={{ color: "#EFA6BA", fontSize: "1.4rem" }} />
