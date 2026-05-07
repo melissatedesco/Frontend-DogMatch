@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import BarraRicercaRazza from "../components/BarraRicercaRazza";
 
 const PLACEHOLDER = "https://cdn-icons-png.flaticon.com/512/616/616408.png";
 
@@ -44,13 +45,18 @@ const AdminHome = ({ onNavigate }) => {
       try {
         const [statsRes, caniRes] = await Promise.all([
           fetch("/api/admin/stats", { headers }),
-          fetch("/api/admin/cani",  { headers }),
+          fetch("/api/cani/all",    { headers }),
         ]);
         const statsData = await statsRes.json();
         const caniData  = await caniRes.json();
         if (statsData.successo) setStats(statsData.stats);
         if (caniData.successo)  setCani(caniData.cani);
-      } catch { /* silent */ } finally { setLoading(false); }
+        else console.error("[AdminHome] /api/cani/all error:", caniData);
+      } catch (err) {
+        console.error("[AdminHome] fetch error:", err);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchAll();
   }, []);
@@ -81,7 +87,7 @@ const AdminHome = ({ onNavigate }) => {
 
   const filtered = cani
     .filter(c => {
-      if (filtro === 'non_verificati') return !c.proprietario?.isVerificato;
+      if (filtro === 'non_verificati') return !(c.proprietario?.isVerificato || c.proprietario?.is_verificato);
       if (filtro === 'segnalati')      return !!c.isSegnalato;
       return true;
     })
@@ -151,18 +157,11 @@ const AdminHome = ({ onNavigate }) => {
           ))}
         </div>
 
-        {/* Ricerca */}
-        <div className="position-relative" style={{ minWidth: "220px" }}>
-          <i className="bi bi-search position-absolute" style={{ left: "14px", top: "50%", transform: "translateY(-50%)", color: "#aaa", fontSize: "0.85rem" }} />
-          <input
-            type="text"
-            className="form-control form-control-sm rounded-pill ps-4"
-            style={{ border: "1.5px solid #d0e8ed", backgroundColor: "#f7fbfc" }}
-            placeholder="Cerca cane o proprietario..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
+        {/* Ricerca per razza */}
+        <BarraRicercaRazza
+          isAdmin={true}
+          onSearch={razza => setSearch(razza || "")}
+        />
       </div>
 
       {/* Grid cani */}
@@ -205,7 +204,7 @@ const AdminHome = ({ onNavigate }) => {
                           <i className="bi bi-flag-fill me-1" />Segnalato
                         </span>
                       )}
-                      {cane.proprietario?.isVerificato ? (
+                      {(cane.proprietario?.isVerificato || cane.proprietario?.is_verificato) ? (
                         <span className="badge rounded-pill text-white px-2" style={{ backgroundColor: "#28a745", fontSize: "0.6rem" }}>
                           <i className="bi bi-patch-check-fill me-1" />Verificato
                         </span>

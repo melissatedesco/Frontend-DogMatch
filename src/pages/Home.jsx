@@ -1,6 +1,7 @@
+import { useState } from "react";
 import AdminHome from "./AdminHome";
-import MatchRequestCard from "../components/MatchCane"
-import BreedSelector from "../data/Razza"
+import MatchRequestCard from "../components/MatchCane";
+import BarraRicercaRazza from "../components/BarraRicercaRazza";
 
 const INTENTI = [
     { value: "",              label: "Tutti" },
@@ -8,10 +9,16 @@ const INTENTI = [
     { value: "accoppiamento", label: "Accoppiamento" },
 ];
 
-const DISTANZE = [
-    { value: "",         label: "Tutta Italia" },
+const DISTANZE_BASE = [
+    { value: "",          label: "Tutta Italia" },
     { value: "provincia", label: "Provincia" },
     { value: "regione",   label: "Regione" },
+];
+
+const DISTANZE_KM = [
+    { value: "5",  label: "5 km" },
+    { value: "10", label: "10 km" },
+    { value: "50", label: "50 km" },
 ];
 
 const FilterPill = ({ options, current, onChange }) => (
@@ -35,64 +42,161 @@ const FilterPill = ({ options, current, onChange }) => (
     </div>
 );
 
-const emptyMessage = (breed, setBreed, feedError) => {
-    if (breed) return (
-        <>Nessun risultato per <strong>{breed}</strong>. Prova a cambiare razza o <button className="btn btn-link btn-sm p-0" onClick={() => setBreed("")}>mostra tutti</button>.</>
+/* ── Stato "nessun cane registrato" ── */
+const NoCanePrompt = ({ onNavigate }) => (
+    <div className="d-flex justify-content-center align-items-center" style={{ minHeight: "55vh" }}>
+        <div
+            className="text-center p-5 rounded-4 shadow-sm"
+            style={{ maxWidth: "420px", backgroundColor: "white", border: "1.5px solid #f0e8f5" }}
+        >
+            <div style={{ fontSize: "4rem", marginBottom: "1rem" }}>🐾</div>
+            <h5 className="fw-bold mb-2" style={{ color: "#1c1e21" }}>Aggiungi il tuo cane!</h5>
+            <p className="text-muted small mb-4">
+                Per vedere altri cani della stessa razza devi prima registrare il tuo.
+                Vai al profilo e aggiungi il tuo amico a quattro zampe!
+            </p>
+            <button
+                className="btn fw-bold text-white rounded-pill px-5 py-2"
+                style={{ backgroundColor: "#EFA6BA", border: "none", fontSize: "0.95rem" }}
+                onClick={() => onNavigate("profile")}
+            >
+                <i className="bi bi-plus-circle-fill me-2" />Aggiungi il tuo cane
+            </button>
+        </div>
+    </div>
+);
+
+/* ── Stato "nessun risultato" ── */
+const EmptyFeed = ({ feedError, caneRazza }) => {
+    if (feedError === "errore_server") {
+        return (
+            <div className="text-center py-5 text-muted">
+                <i className="bi bi-wifi-off d-block mb-3" style={{ fontSize: "3rem", opacity: 0.3 }} />
+                <p className="fw-semibold mb-1">Connessione assente</p>
+                <p className="small">Errore di connessione al server. Riprova più tardi.</p>
+            </div>
+        );
+    }
+    const razza = caneRazza || "cani della stessa razza";
+    return (
+        <div className="text-center py-5 text-muted">
+            <div style={{ fontSize: "3.5rem", marginBottom: "0.75rem", opacity: 0.6 }}>🐕</div>
+            <p className="fw-semibold mb-1">Nessun {razza} nei paraggi</p>
+            <p className="small">
+                Al momento non ci sono altri <strong>{razza}</strong> disponibili nella tua zona.
+                <br />Prova a cambiare zona o invita un amico!
+            </p>
+        </div>
     );
-    if (feedError === "nessun_cane") return "Aggiungi prima il tuo cane dal profilo per vedere il feed.";
-    if (feedError === "errore_server") return "Errore di connessione al server. Riprova più tardi.";
-    return "Hai già visto tutti i cani disponibili. Torna più tardi!";
 };
 
-const Home = ({ dogs, loading, feedError, breed, setBreed, setSelectedDog, handleAcceptMatch, handleRejectDog, user,
-                filtroIntento, setFiltroIntento, filtroDistanza, setFiltroDistanza, onNavigate }) => {
+const Home = ({ dogs, loading, feedError, setSelectedDog, handleAcceptMatch, user,
+                filtroIntento, setFiltroIntento, filtroDistanza, setFiltroDistanza, onNavigate,
+                hasLocation, selectedCaneIdx, onSwitchCane }) => {
+    const [localSearch, setLocalSearch] = useState("");
 
     if (user?.ruolo === 'admin') {
         return <AdminHome onNavigate={onNavigate} />;
     }
 
+    const caniUtente = user?.iMieiCani ?? [];
+    const activeCane = caniUtente[selectedCaneIdx] ?? caniUtente[0];
+    const caneRazza = activeCane?.razza ?? null;
+
+    // Nessun cane registrato → prompt dedicato
+    if (!loading && feedError === "nessun_cane") {
+        return <NoCanePrompt onNavigate={onNavigate} />;
+    }
+
     return (
         <div className="container-fluid p-0">
-            {/* filtri razza */}
-            <div className="d-flex gap-2 overflow-auto pb-2 no-scrollbar">
-                <BreedSelector setBreed={setBreed} currentBreed={breed} user={user} />
-            </div>
 
-            {/* filtri discovery */}
+            {/* Selettore cane attivo (solo se l'utente ha più cani) */}
+            {caniUtente.length > 1 && (
+                <div className="bg-white rounded-4 shadow-sm p-3 mb-3 d-flex align-items-center gap-3 flex-wrap"
+                    style={{ border: "1px solid #e8f4f8" }}>
+                    <span className="small fw-bold text-muted" style={{ whiteSpace: "nowrap" }}>
+                        <i className="bi bi-balloon-heart me-1" style={{ color: "#EFA6BA" }} />Stai cercando per:
+                    </span>
+                    <div className="d-flex gap-2 flex-wrap">
+                        {caniUtente.map((cane, idx) => (
+                            <button
+                                key={cane.id}
+                                className="btn btn-sm rounded-pill px-3 fw-semibold"
+                                style={{
+                                    backgroundColor: idx === selectedCaneIdx ? "#EFA6BA" : "#f0f2f5",
+                                    color: idx === selectedCaneIdx ? "white" : "#555",
+                                    border: "none",
+                                    fontSize: "0.82rem",
+                                }}
+                                onClick={() => onSwitchCane(idx)}
+                            >
+                                {cane.nome}
+                                <span style={{ opacity: 0.75, fontWeight: 400 }}> · {cane.razza}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Filtri */}
             <div className="bg-white rounded-4 shadow-sm p-3 mb-4 d-flex flex-wrap gap-3 align-items-center"
                 style={{ border: "1px solid #e8f4f8" }}>
                 <div className="d-flex align-items-center gap-2">
                     <span className="small fw-bold text-muted" style={{ whiteSpace: "nowrap" }}>Intento:</span>
                     <FilterPill options={INTENTI} current={filtroIntento} onChange={setFiltroIntento} />
                 </div>
-                <div className="d-flex align-items-center gap-2">
+                <div className="d-flex align-items-center gap-2 flex-wrap">
                     <span className="small fw-bold text-muted" style={{ whiteSpace: "nowrap" }}>Distanza:</span>
-                    <FilterPill options={DISTANZE} current={filtroDistanza} onChange={setFiltroDistanza} />
+                    <FilterPill options={DISTANZE_BASE} current={filtroDistanza} onChange={setFiltroDistanza} />
+                    {hasLocation && (
+                        <>
+                            <span className="text-muted small" style={{ opacity: 0.4 }}>|</span>
+                            <FilterPill options={DISTANZE_KM} current={filtroDistanza} onChange={setFiltroDistanza} />
+                        </>
+                    )}
+                    {!hasLocation && (
+                        <span className="small text-muted" style={{ opacity: 0.55, fontStyle: "italic" }}>
+                            <i className="bi bi-geo-alt me-1" />Abilita posizione per filtri km
+                        </span>
+                    )}
                 </div>
             </div>
 
-            <h4 className="fw-bold mb-4">Consigliati per te</h4>
+            {/* Titolo + barra ricerca razza */}
+            <div className="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+                {caneRazza && (
+                    <h4 className="fw-bold mb-0">
+                        {caneRazza}{" "}
+                        <span className="fw-normal text-muted" style={{ fontSize: "1rem" }}>nella tua zona</span>
+                    </h4>
+                )}
+                <BarraRicercaRazza
+                    caneRazza={caneRazza}
+                    isAdmin={false}
+                    onSearch={setLocalSearch}
+                />
+            </div>
 
             {loading ? (
                 <div className="text-center py-5">
-                    <div className="spinner-border text-success"></div>
+                    <div className="spinner-border" style={{ color: "#EFA6BA" }} />
                 </div>
             ) : dogs.length === 0 ? (
-                <div className="text-center py-5 text-muted">
-                    <i className={`bi ${feedError === "errore_server" ? "bi-wifi-off" : "bi-search"} d-block mb-3`} style={{ fontSize: "3rem", opacity: 0.3 }} />
-                    <p className="fw-semibold mb-1">Nessun cane trovato</p>
-                    <p className="small">{emptyMessage(breed, setBreed, feedError)}</p>
-                </div>
+                <EmptyFeed feedError={feedError} caneRazza={caneRazza} />
             ) : (
                 <div className="row g-4">
-                    {dogs.map((dog) => (
+                    {dogs
+                        .filter(dog =>
+                            !localSearch ||
+                            dog.name?.toLowerCase().includes(localSearch.toLowerCase())
+                        )
+                        .map((dog) => (
                         <div className="col-12 col-md-6 col-lg-4" key={dog.id}>
                             <MatchRequestCard
                                 dog={dog}
-                                user={user}
                                 onView={(dog) => setSelectedDog(dog)}
                                 onAccept={() => handleAcceptMatch(dog.id)}
-                                onReject={handleRejectDog}
                             />
                         </div>
                     ))}
@@ -102,4 +206,4 @@ const Home = ({ dogs, loading, feedError, breed, setBreed, setSelectedDog, handl
     );
 };
 
-export default Home
+export default Home;

@@ -5,7 +5,7 @@ const PLACEHOLDER = "https://cdn-icons-png.flaticon.com/512/616/616408.png";
 const buildImgUrl = (raw) => {
   if (!raw || raw === 'default-dog.png') return PLACEHOLDER;
   if (raw.startsWith("http")) return raw;
-  return `/uploads/${raw.replace("uploads/", "")}`;
+  return `/uploads/${raw.replace(/^\/?(uploads\/)?/, "")}`;
 };
 
 const formatOra = (dateStr) => {
@@ -59,12 +59,12 @@ const AdminMatchSidebar = () => {
               {/* Foto sovrapposte */}
               <div className="position-relative flex-shrink-0" style={{ width: 44, height: 28 }}>
                 <img
-                  src={buildImgUrl(m.mittente?.fotoUrl)}
+                  src={buildImgUrl(m.mittente?.fotoUrl ?? m.mittente?.foto_url)}
                   onError={e => { e.target.src = PLACEHOLDER; }}
                   style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", border: "2px solid #EFA6BA", position: "absolute", left: 0, zIndex: 2 }}
                 />
                 <img
-                  src={buildImgUrl(m.ricevente?.fotoUrl)}
+                  src={buildImgUrl(m.ricevente?.fotoUrl ?? m.ricevente?.foto_url)}
                   onError={e => { e.target.src = PLACEHOLDER; }}
                   style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", border: "2px solid #7FBCC8", position: "absolute", left: 16, zIndex: 1 }}
                 />

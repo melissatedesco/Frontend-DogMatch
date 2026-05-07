@@ -17,7 +17,7 @@ import Messaggi from "./pages/Messaggi";
 import RichiesteMatch from "./pages/RichiesteMatch";
 import SnoutBot from "./components/SnoutBot";
 import { dogService } from "./services/dogServices";
-import { inviaLike, inviaDislike, getRichiesteRicevute, rifiutaRichiesta } from "./services/interazioneServices";
+import { inviaLike, getRichiesteRicevute, rifiutaRichiesta } from "./services/interazioneServices";
 import { getSocket, disconnectSocket } from "./services/socketService";
 import { fetchNotifiche, segnaNotificaLetta, segnaAllNotificheLette } from "./services/notificaServices";
 
@@ -26,10 +26,11 @@ function App() {
   const [dogs, setDogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [feedError, setFeedError] = useState(null);
-  const [breed, setBreed] = useState("");
   const [selectedDog, setSelectedDog] = useState(null);
   const [filtroIntento, setFiltroIntento] = useState("");
   const [filtroDistanza, setFiltroDistanza] = useState("");
+  const [userLocation, setUserLocation] = useState(null);
+  const [selectedCaneIdx, setSelectedCaneIdx] = useState(0);
   const [showMatchAlert, setShowMatchAlert] = useState(false);
   const [currentPage, setCurrentPage] = useState("landing");
   const [user, setUser] = useState(null); // Parte come null
@@ -47,6 +48,27 @@ function App() {
   const pollingRef = useRef(null);
   const chatApertaIdRef = useRef(null);
   const toastTimerRef = useRef(null);
+
+  // Geolocation: richiesta una sola volta per sessione
+  useEffect(() => {
+    if (!user || user.ruolo === 'admin') return;
+    if (!navigator.geolocation) return;
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+        setUserLocation(coords);
+        const token = localStorage.getItem('token');
+        fetch('/api/utenti/posizione', {
+          method: 'PUT',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ latitudine: coords.lat, longitudine: coords.lon })
+        }).catch(() => {});
+      },
+      () => { /* permesso negato */ }
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, user?.ruolo]);
 
   // 1. Controllo sessione all'avvio
   useEffect(() => {
@@ -299,7 +321,8 @@ function App() {
       setFeedError(null);
       try {
         const caniUtente = user.iMieiCani || user.cani || [];
-        const mioCaneId = caniUtente.length > 0 ? caniUtente[0].id : null;
+        const activeCane = caniUtente[selectedCaneIdx] ?? caniUtente[0];
+        const mioCaneId = activeCane?.id ?? null;
 
         if (!mioCaneId) {
           setDogs([]);
@@ -308,7 +331,15 @@ function App() {
           return;
         }
 
-        const response = await dogService.getDiscovery(mioCaneId, { intento: filtroIntento, distanza: filtroDistanza });
+        const KM_FILTERS = ["5", "10", "50"];
+        const isKmFilter = KM_FILTERS.includes(filtroDistanza);
+        const useVicini = isKmFilter && userLocation;
+        // Quando km filter selezionato ma nessuna posizione → discovery senza filtro geo
+        const discoveryDistanza = isKmFilter ? "" : filtroDistanza;
+
+        const response = useVicini
+          ? await dogService.getVicini(mioCaneId, Number(filtroDistanza))
+          : await dogService.getDiscovery(mioCaneId, { intento: filtroIntento, distanza: discoveryDistanza });
         const data = response.data || response;
 
         if (data.successo && data.cani) {
@@ -320,7 +351,7 @@ function App() {
               name: dog.nome,
               photo: nomeFile ? `/uploads/${nomeFile}` : "https://via.placeholder.com/400",
               breed: dog.razza,
-              distance: Math.floor(Math.random() * 20) + 1
+              distance: dog.distanza_km != null ? parseFloat(dog.distanza_km) : null
             };
           });
           setDogs(caniFormattati);
@@ -330,6 +361,13 @@ function App() {
         }
       } catch (err) {
         console.error("Errore caricamento feed:", err);
+        if (err.status === 403) {
+          // Account bannato mentre la sessione era attiva
+          const banned = { ...user, isBanned: true, isBloccato: true };
+          setUser(banned);
+          localStorage.setItem("user", JSON.stringify(banned));
+          return;
+        }
         setDogs([]);
         setFeedError("errore_server");
       } finally {
@@ -338,7 +376,7 @@ function App() {
     };
 
     caricaFeedReale();
-  }, [currentPage, user, filtroIntento, filtroDistanza]);
+  }, [currentPage, user, filtroIntento, filtroDistanza, userLocation, selectedCaneIdx]);
 
   // 5. Reducer per i Match
   const initialState = {
@@ -355,19 +393,11 @@ function App() {
 
     if (!selectedDogData || !user) return;
 
-    const mioCaneId = user.iMieiCani?.[0]?.id;
+    const caniUtente = user.iMieiCani || user.cani || [];
+    const mioCaneId = (caniUtente[selectedCaneIdx] ?? caniUtente[0])?.id;
     if (!mioCaneId) {
       alert("Nessun cane associato al tuo account.");
       return;
-    }
-
-    // Controllo compatibilità razza solo per accoppiamento
-    if (filtroIntento === 'accoppiamento') {
-      const userBreed = user.iMieiCani?.[0]?.razza || "Meticcio";
-      if ((selectedDogData.razza ?? '').toUpperCase() !== userBreed.toUpperCase()) {
-        alert(`RAZZA NON COMPATIBILE\n\nPer l'accoppiamento puoi fare match solo con esemplari di razza ${userBreed}`);
-        return;
-      }
     }
 
     try {
@@ -394,16 +424,6 @@ function App() {
     }
   };
 
-  const handleRejectDog = async (dogId) => {
-    const mioCaneId = user?.iMieiCani?.[0]?.id;
-    if (!mioCaneId) return;
-    try {
-      await inviaDislike(mioCaneId, dogId);
-    } catch (err) {
-      console.error("Errore durante il dislike:", err);
-    }
-    setDogs((prev) => prev.filter((d) => d.id !== dogId));
-  };
 
   const triggerMatchAnimation = () => {
     setShowMatchAlert(true);
@@ -458,8 +478,8 @@ function App() {
     localStorage.setItem("dogMatches", JSON.stringify(state.matches));
   }, [state.matches]);
 
-  // logica di blocco
-  if (user && user.isBanned) {
+  // logica di blocco — controlla sia isBanned (da toJSON) sia isBloccato (fallback raw)
+  if (user && (user.isBanned || user.isBloccato)) {
     return <BannedPage user={user} onLogout={handleLogout} />;
   }
 
@@ -519,20 +539,20 @@ function App() {
               <div className="row g-3 g-lg-4">
                 <div className="col-xl-9 col-lg-8">
                   <Home
-                    dogs={breed ? dogs.filter(d => d.razza?.toLowerCase().includes(breed.toLowerCase())) : dogs}
+                    dogs={dogs}
                     loading={loading}
                     feedError={feedError}
-                    breed={breed}
-                    setBreed={setBreed}
                     setSelectedDog={setSelectedDog}
                     handleAcceptMatch={handleAcceptMatch}
-                    handleRejectDog={handleRejectDog}
                     user={user}
                     filtroIntento={filtroIntento}
                     setFiltroIntento={setFiltroIntento}
                     filtroDistanza={filtroDistanza}
                     setFiltroDistanza={setFiltroDistanza}
                     onNavigate={(page) => setCurrentPage(page)}
+                    hasLocation={!!userLocation}
+                    selectedCaneIdx={selectedCaneIdx}
+                    onSwitchCane={(idx) => { setSelectedCaneIdx(idx); setDogs([]); }}
                   />
                 </div>
 

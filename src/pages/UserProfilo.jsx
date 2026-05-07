@@ -52,6 +52,7 @@ const UserProfilo = ({ user: userProp, onUpdate, onLogout }) => {
   const [privacyTelefonoDraft,  setPrivacyTelefonoDraft]  = useState(true);
   const [privacyEmail,          setPrivacyEmail]          = useState(user?.mostraEmail ?? true);
   const [privacyTelefono,       setPrivacyTelefono]       = useState(user?.mostraTelefono ?? true);
+  const [privacyPosizione,      setPrivacyPosizione]      = useState(user?.mostraPosizione ?? true);
 
   // file uploads
   const [userPhotoFile,    setUserPhotoFile]    = useState(null);
@@ -150,6 +151,22 @@ const UserProfilo = ({ user: userProp, onUpdate, onLogout }) => {
     } catch {
       if (field === "email")    setPrivacyEmail(!value);
       else                      setPrivacyTelefono(!value);
+    }
+  };
+
+  const handlePosizioneToggle = async (value) => {
+    setPrivacyPosizione(value);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch("/api/utenti/posizione", {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ mostraPosizione: value })
+      });
+      const data = await res.json();
+      if (!data.successo) throw new Error();
+    } catch {
+      setPrivacyPosizione(!value);
     }
   };
 
@@ -981,6 +998,24 @@ const UserProfilo = ({ user: userProp, onUpdate, onLogout }) => {
                       <input className="form-check-input" type="checkbox" id="privacyTelefonoModal"
                         checked={privacyTelefono}
                         onChange={(e) => handlePrivacyToggle("telefono", e.target.checked)}
+                        style={{ width: "2.5em", height: "1.3em" }} />
+                    </div>
+                  </div>
+                  <div className="d-flex align-items-center justify-content-between p-3 rounded-3"
+                       style={{ backgroundColor: "#f7fbfc", border: "1.5px solid #d0e8ed" }}>
+                    <div className="d-flex align-items-center gap-2 small" style={{ color: "#555" }}>
+                      <i className="bi bi-geo-alt-fill" style={{ color: "#7FBCC8" }} />
+                      <div>
+                        <span>Mostra posizione agli altri utenti</span>
+                        <p className="mb-0" style={{ fontSize: "0.72rem", color: "#999" }}>
+                          Disattiva per non apparire nei filtri per distanza
+                        </p>
+                      </div>
+                    </div>
+                    <div className="form-check form-switch mb-0">
+                      <input className="form-check-input" type="checkbox" id="privacyPosizioneModal"
+                        checked={privacyPosizione}
+                        onChange={(e) => handlePosizioneToggle(e.target.checked)}
                         style={{ width: "2.5em", height: "1.3em" }} />
                     </div>
                   </div>
