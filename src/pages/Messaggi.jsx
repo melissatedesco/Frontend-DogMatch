@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import MatchList from "../components/ListaRichieste.jsx";
 import ChatWindow from "../components/ChatWindow";
 
-const Messaggi = ({ matches, onBack, msgNotifiche = {}, clearMsgNotifica, initialMatch }) => {
+const Messaggi = ({ matches, onBack, msgNotifiche = {}, clearMsgNotifica, initialMatch, onChatChange }) => {
   const [selectedMatch, setSelectedMatch] = useState(initialMatch || null);
 
   // Quando viene passato un match da aprire (clic dal sidebar home o da notifica)
@@ -12,6 +12,7 @@ const Messaggi = ({ matches, onBack, msgNotifiche = {}, clearMsgNotifica, initia
       if (clearMsgNotifica && initialMatch.interazioneId) {
         clearMsgNotifica(initialMatch.interazioneId);
       }
+      if (onChatChange) onChatChange(initialMatch.interazioneId);
     }
   }, [initialMatch?.interazioneId]);
 
@@ -20,6 +21,12 @@ const Messaggi = ({ matches, onBack, msgNotifiche = {}, clearMsgNotifica, initia
     if (clearMsgNotifica && m.interazioneId) {
       clearMsgNotifica(m.interazioneId);
     }
+    if (onChatChange) onChatChange(m.interazioneId);
+  };
+
+  const handleBackFromChat = () => {
+    setSelectedMatch(null);
+    if (onChatChange) onChatChange(null);
   };
 
   return (
@@ -49,7 +56,7 @@ const Messaggi = ({ matches, onBack, msgNotifiche = {}, clearMsgNotifica, initia
           {selectedMatch ? (
             <ChatWindow
               match={selectedMatch}
-              onBack={() => setSelectedMatch(null)}
+              onBack={handleBackFromChat}
             />
           ) : (
             <div className="m-auto text-center p-4">

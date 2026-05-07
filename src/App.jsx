@@ -18,6 +18,7 @@ import SnoutBot from "./components/SnoutBot";
 import { dogService } from "./services/dogServices";
 import { inviaLike, inviaDislike, getRichiesteRicevute, rifiutaRichiesta } from "./services/interazioneServices";
 import { getSocket, disconnectSocket } from "./services/socketService";
+import { fetchNotifiche, segnaNotificaLetta, segnaAllNotificheLette } from "./services/notificaServices";
 
 
 function App() {
@@ -40,7 +41,11 @@ function App() {
   const [richieste, setRichieste] = useState([]);
   const [msgNotifiche, setMsgNotifiche] = useState({});
   const [selectedMatchToOpen, setSelectedMatchToOpen] = useState(null);
+  const [notifiche, setNotifiche] = useState([]);
+  const [toastRichiesta, setToastRichiesta] = useState({ show: false, notifica: null });
   const pollingRef = useRef(null);
+  const chatApertaIdRef = useRef(null);
+  const toastTimerRef = useRef(null);
 
   // 1. Controllo sessione all'avvio
   useEffect(() => {
@@ -113,6 +118,10 @@ function App() {
     // Polling richieste
     aggiornaSollecitiRichieste(user);
     pollingRef.current = setInterval(() => aggiornaSollecitiRichieste(user), 30000);
+
+    // Carica notifiche storiche (copre notifiche ricevute offline)
+    fetchNotifiche().then(d => { if (d.successo) setNotifiche(d.notifiche); }).catch(() => {});
+
     return () => clearInterval(pollingRef.current);
   }, [user]);
 
@@ -142,16 +151,53 @@ function App() {
     setCurrentPage('landing');
   };
 
-  // Socket: notifiche messaggi in tempo reale
+  // Socket: notifiche messaggi in tempo reale — skip se l'utente è già in quella chat
   useEffect(() => {
     if (!user) return;
     const socket = getSocket();
     const handler = ({ interazioneId }) => {
+      if (String(interazioneId) === String(chatApertaIdRef.current)) return;
       setMsgNotifiche(prev => ({ ...prev, [interazioneId]: (prev[interazioneId] || 0) + 1 }));
       setNotifications(prev => ({ ...prev, messages: prev.messages + 1 }));
     };
     socket.on('nuova_notifica_messaggio', handler);
     return () => socket.off('nuova_notifica_messaggio', handler);
+  }, [user]);
+
+  // Socket: notifiche unificate (richiesta_match, match_accettato, messaggio)
+  useEffect(() => {
+    if (!user) return;
+    const socket = getSocket();
+    const handler = (notifica) => {
+      // Aggiunge alla lista storica (campanella)
+      setNotifiche(prev => {
+        if (prev.some(n => n.id === notifica.id)) return prev;
+        return [notifica, ...prev].slice(0, 50);
+      });
+
+      // Aggiorna lista richieste se è una richiesta_match
+      if (notifica.tipo === 'richiesta_match' && notifica.payload) {
+        const { interazioneId, intento, cane } = notifica.payload;
+        setRichieste(prev => {
+          if (prev.some(r => r.interazioneId === interazioneId)) return prev;
+          return [...prev, { interazioneId, intento, cane }];
+        });
+        setNotifications(prev => ({ ...prev, richieste: prev.richieste + 1 }));
+      }
+
+      // Toast auto-sparisce dopo 5 secondi
+      setToastRichiesta({ show: true, notifica });
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = setTimeout(
+        () => setToastRichiesta({ show: false, notifica: null }),
+        5000
+      );
+    };
+    socket.on('nuova_notifica', handler);
+    return () => {
+      socket.off('nuova_notifica', handler);
+      clearTimeout(toastTimerRef.current);
+    };
   }, [user]);
 
   const clearMsgNotifica = (interazioneId) => {
@@ -163,16 +209,40 @@ function App() {
     setNotifications(prev => ({ ...prev, messages: Math.max(0, prev.messages - 1) }));
   };
 
+  const handleMarkNotificaRead = async (id) => {
+    setNotifiche(prev => prev.map(n => n.id === id ? { ...n, letto: true } : n));
+    segnaNotificaLetta(id).catch(() => {});
+  };
+
+  const handleMarkAllNotificheRead = async () => {
+    setNotifiche(prev => prev.map(n => ({ ...n, letto: true })));
+    segnaAllNotificheLette().catch(() => {});
+  };
+
+  const handleNotificaClick = (notifica) => {
+    handleMarkNotificaRead(notifica.id);
+    if (notifica.link === 'requests') {
+      setCurrentPage('requests');
+    } else if (notifica.link?.startsWith('chat:')) {
+      const interazioneId = notifica.link.split(':')[1];
+      const match = state.matches.find(m => String(m.interazioneId) === String(interazioneId));
+      if (match) apriChat(match);
+      else setCurrentPage('messages');
+    }
+  };
+
   // Apri una specifica chat navigando verso messages
   const apriChat = (match) => {
     setSelectedMatchToOpen(match);
     setCurrentPage("messages");
   };
 
-  // Azzera il badge messaggi quando si entra nella pagina messages
+  // Azzera il badge messaggi quando si entra nella pagina messages; pulisce la chat aperta quando si esce
   useEffect(() => {
     if (currentPage === "messages") {
       setNotifications(prev => ({ ...prev, messages: 0 }));
+    } else {
+      chatApertaIdRef.current = null;
     }
   }, [currentPage]);
 
@@ -371,6 +441,9 @@ function App() {
             notifications={notifications}
             richieste={richieste}
             onNavigate={(page) => setCurrentPage(page)}
+            notifiche={notifiche}
+            onNotificaClick={handleNotificaClick}
+            onMarkAllRead={handleMarkAllNotificheRead}
           />
 
           <main className="container-fluid px-2 px-md-5 flex-grow-1 py-4">
@@ -448,6 +521,7 @@ function App() {
                 msgNotifiche={msgNotifiche}
                 clearMsgNotifica={clearMsgNotifica}
                 initialMatch={selectedMatchToOpen}
+                onChatChange={(id) => { chatApertaIdRef.current = id; }}
               />
             )}
           </main>
@@ -463,6 +537,30 @@ function App() {
           )}
           {showMatchAlert && <MatchAnimation />}
           <SnoutBot />
+
+          {/* Toast: notifica in tempo reale */}
+          {toastRichiesta.show && toastRichiesta.notifica && (
+            <div className="position-fixed bottom-0 end-0 p-3" style={{ zIndex: 9999 }}>
+              <div
+                className="d-flex align-items-center gap-3 px-3 py-2 shadow-lg text-white"
+                style={{ backgroundColor: '#EFA6BA', borderRadius: '14px', minWidth: '260px', maxWidth: '320px' }}
+              >
+                <i className="bi bi-bell-fill flex-shrink-0" style={{ fontSize: '1.2rem' }} />
+                <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                  <div className="fw-bold" style={{ fontSize: '0.85rem' }}>Nuova notifica</div>
+                  <div className="text-truncate" style={{ fontSize: '0.75rem', opacity: 0.9 }}>
+                    {toastRichiesta.notifica.messaggio}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn-close btn-close-white flex-shrink-0"
+                  style={{ fontSize: '0.6rem' }}
+                  onClick={() => setToastRichiesta({ show: false, notifica: null })}
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
     </>
