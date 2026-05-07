@@ -46,6 +46,8 @@ const UserProfilo = ({ user: userProp, onUpdate, onLogout }) => {
   const [caneSessoDraft,        setCaneSessoDraft]        = useState("M");
   const [caneDisponibilitaDraft,setCaneDisponibilitaDraft]= useState(false);
   const [caneInfoSanitarieDraft,setCaneInfoSanitarieDraft]= useState("");
+  const [provinciaDraft,        setProvinciaDraft]        = useState("");
+  const [regioneDraft,          setRegioneDraft]          = useState("");
   const [privacyEmailDraft,     setPrivacyEmailDraft]     = useState(true);
   const [privacyTelefonoDraft,  setPrivacyTelefonoDraft]  = useState(true);
   const [privacyEmail,          setPrivacyEmail]          = useState(user?.mostraEmail ?? true);
@@ -113,7 +115,7 @@ const UserProfilo = ({ user: userProp, onUpdate, onLogout }) => {
     setIsDeleting(true);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("/api/utenti/me", {
+      const res = await fetch("/api/utenti/profilo", {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -153,6 +155,8 @@ const UserProfilo = ({ user: userProp, onUpdate, onLogout }) => {
 
   const openEdit = () => {
     setBioDraft(user.bio ?? "");
+    setProvinciaDraft(user.provincia ?? "");
+    setRegioneDraft(user.regione ?? "");
     setCaneNomeDraft(cane?.nome ?? "");
     setCaneBioDraft(cane?.descrizione ?? "");
     setCaneEtaDraft(cane?.eta ?? "");
@@ -176,6 +180,8 @@ const UserProfilo = ({ user: userProp, onUpdate, onLogout }) => {
       const token = localStorage.getItem("token");
       const fd = new FormData();
       fd.append("bio", bioDraft);
+      if (provinciaDraft.trim()) fd.append("provincia", provinciaDraft.trim());
+      if (regioneDraft.trim())   fd.append("regione",   regioneDraft.trim());
       if (caneNomeDraft.trim())    fd.append("caneNome", caneNomeDraft.trim());
       fd.append("descrizione",      caneBioDraft);
       if (String(caneEtaDraft) !== "")  fd.append("caneEta",  caneEtaDraft);
@@ -411,10 +417,24 @@ const UserProfilo = ({ user: userProp, onUpdate, onLogout }) => {
           </h6>
 
           {/* Bio utente */}
-          <div className="mb-4">
+          <div className="mb-3">
             <label className="form-label fw-bold small" style={{ color: "#555" }}>La tua Bio</label>
             <textarea rows={3} style={inputStyle} placeholder="Scrivi qualcosa su di te..."
               value={bioDraft} onChange={(e) => setBioDraft(e.target.value)} />
+          </div>
+
+          {/* Posizione */}
+          <div className="row g-3 mb-4">
+            <div className="col-md-6">
+              <label className="form-label fw-bold small" style={{ color: "#555" }}>Provincia</label>
+              <input type="text" style={{ ...inputStyle, resize: "none" }} placeholder="es. RM"
+                value={provinciaDraft} onChange={(e) => setProvinciaDraft(e.target.value)} />
+            </div>
+            <div className="col-md-6">
+              <label className="form-label fw-bold small" style={{ color: "#555" }}>Regione</label>
+              <input type="text" style={{ ...inputStyle, resize: "none" }} placeholder="es. Lazio"
+                value={regioneDraft} onChange={(e) => setRegioneDraft(e.target.value)} />
+            </div>
           </div>
 
           {cane && (
@@ -579,12 +599,16 @@ const UserProfilo = ({ user: userProp, onUpdate, onLogout }) => {
         {/* ── COLONNA SX ── */}
         <div className="d-flex flex-column gap-3">
 
-          {/* Bio utente + contatti */}
+          {/* Bio del cane (colonna sx) */}
           <div style={{ backgroundColor: "white", borderRadius: "16px", padding: "20px", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-            <h6 className="fw-bold mb-3" style={{ color: "#1c1e21" }}>Bio dell'utente</h6>
-            <p className="text-muted small mb-3" style={{ lineHeight: "1.6" }}>
-              {user.bio || "Nessuna bio. Clicca su Modifica Profilo per aggiungerne una!"}
-            </p>
+            <h6 className="fw-bold mb-3" style={{ color: "#1c1e21" }}>
+              Bio di {cane?.nome || "Cane"}
+            </h6>
+            <div style={{ borderLeft: "4px solid #EFA6BA", paddingLeft: "16px", marginBottom: "16px" }}>
+              <p className="text-muted small mb-0" style={{ lineHeight: "1.6" }}>
+                {cane?.descrizione || "Nessuna bio. Clicca su Modifica Profilo per aggiungerne una!"}
+              </p>
+            </div>
             <hr style={{ borderColor: "#f0f0f0", margin: "0 0 12px" }} />
             <p className="mb-2" style={sectionLabel}>Contatti</p>
             <div className="d-flex flex-column gap-2">
@@ -698,12 +722,12 @@ const UserProfilo = ({ user: userProp, onUpdate, onLogout }) => {
         {/* ── COLONNA DX ── */}
         <div className="d-flex flex-column gap-3">
 
-          {/* Bio del cane + scheda tecnica */}
+          {/* Introduzione (bio utente) + scheda tecnica cane */}
           <div style={{ backgroundColor: "white", borderRadius: "16px", padding: "20px", boxShadow: "0 2px 8px rgba(0,0,0,0.06)" }}>
-            <h6 className="fw-bold mb-3" style={{ color: "#1c1e21" }}>Bio del Cane</h6>
-            <div style={{ borderLeft: "4px solid #EFA6BA", paddingLeft: "16px", marginBottom: "16px" }}>
+            <h6 className="fw-bold mb-3" style={{ color: "#1c1e21" }}>Introduzione</h6>
+            <div style={{ borderLeft: "4px solid #7FBCC8", paddingLeft: "16px", marginBottom: "16px" }}>
               <p className="mb-0" style={{ color: "#555", lineHeight: "1.7" }}>
-                {cane?.descrizione || "Nessuna bio. Clicca su Modifica Profilo per aggiungerne una!"}
+                {user.bio || "Nessuna presentazione. Clicca su Modifica Profilo per aggiungerne una!"}
               </p>
             </div>
 

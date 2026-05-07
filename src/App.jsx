@@ -9,6 +9,7 @@ import AdminPanel from "./pages/AdminPanel";
 import PrimaPagina from "./pages/PrimaPage";
 import Login from "./pages/Login";
 import Registrazione from "./pages/Registrazione";
+import BannedPage from "./pages/BannedPage";
 import Footer from "./components/Footer";
 import Home from "./pages/Home";
 import Messaggi from "./pages/Messaggi";
@@ -16,13 +17,18 @@ import RichiesteMatch from "./pages/RichiesteMatch";
 import SnoutBot from "./components/SnoutBot";
 import { dogService } from "./services/dogServices";
 import { inviaLike, inviaDislike, getRichiesteRicevute, rifiutaRichiesta } from "./services/interazioneServices";
+import { getSocket, disconnectSocket } from "./services/socketService";
+import { fetchNotifiche, segnaNotificaLetta, segnaAllNotificheLette } from "./services/notificaServices";
 
 
 function App() {
   const [dogs, setDogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [feedError, setFeedError] = useState(null);
   const [breed, setBreed] = useState("");
   const [selectedDog, setSelectedDog] = useState(null);
+  const [filtroIntento, setFiltroIntento] = useState("");
+  const [filtroDistanza, setFiltroDistanza] = useState("");
   const [showMatchAlert, setShowMatchAlert] = useState(false);
   const [currentPage, setCurrentPage] = useState("landing");
   const [user, setUser] = useState(null); // Parte come null
@@ -33,7 +39,13 @@ function App() {
     richieste: 0,
   });
   const [richieste, setRichieste] = useState([]);
+  const [msgNotifiche, setMsgNotifiche] = useState({});
+  const [selectedMatchToOpen, setSelectedMatchToOpen] = useState(null);
+  const [notifiche, setNotifiche] = useState([]);
+  const [toastRichiesta, setToastRichiesta] = useState({ show: false, notifica: null });
   const pollingRef = useRef(null);
+  const chatApertaIdRef = useRef(null);
+  const toastTimerRef = useRef(null);
 
   // 1. Controllo sessione all'avvio
   useEffect(() => {
@@ -79,15 +91,24 @@ function App() {
         .then(r => r.json())
         .then(data => {
           if (data.successo && data.matches) {
-            const formattati = data.matches.map(dog => {
-              const rawFile = dog.fotoUrl ?? dog.foto_url ?? "";
-              const nomeFile = rawFile.replace('uploads/', '').replace('/uploads/', '');
-              return {
-                ...dog,
-                name: dog.nome,
-                photo: nomeFile ? `/uploads/${nomeFile}` : "https://via.placeholder.com/400",
-              };
-            });
+            const formattati = data.matches
+              .map(interazione => {
+                // interazione ha mittente e ricevente — prendiamo il cane dell'altro
+                const altroCane = interazione.mittenteCaneId === caneId
+                  ? interazione.ricevente
+                  : interazione.mittente;
+                if (!altroCane) return null;
+                const rawFile = altroCane.fotoUrl ?? "";
+                const nomeFile = rawFile.replace('uploads/', '').replace('/uploads/', '');
+                return {
+                  ...altroCane,
+                  interazioneId: interazione.id,
+                  name: altroCane.nome,
+                  nomeCaneDestinatario: altroCane.nome,
+                  photo: nomeFile ? `/uploads/${nomeFile}` : "https://via.placeholder.com/400",
+                };
+              })
+              .filter(Boolean);
             dispatch({ type: "CARICA_MATCHES", payload: formattati });
           }
         })
@@ -97,6 +118,10 @@ function App() {
     // Polling richieste
     aggiornaSollecitiRichieste(user);
     pollingRef.current = setInterval(() => aggiornaSollecitiRichieste(user), 30000);
+
+    // Carica notifiche storiche (copre notifiche ricevute offline)
+    fetchNotifiche().then(d => { if (d.successo) setNotifiche(d.notifiche); }).catch(() => {});
+
     return () => clearInterval(pollingRef.current);
   }, [user]);
 
@@ -118,6 +143,7 @@ function App() {
 
   // 3. Gestione Logout
   const handleLogout = () => {
+    disconnectSocket();
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('dogMatches');
@@ -125,56 +151,150 @@ function App() {
     setCurrentPage('landing');
   };
 
+  // Socket: notifiche messaggi in tempo reale — skip se l'utente è già in quella chat
+  useEffect(() => {
+    if (!user) return;
+    const socket = getSocket();
+    const handler = ({ interazioneId }) => {
+      if (String(interazioneId) === String(chatApertaIdRef.current)) return;
+      setMsgNotifiche(prev => ({ ...prev, [interazioneId]: (prev[interazioneId] || 0) + 1 }));
+      setNotifications(prev => ({ ...prev, messages: prev.messages + 1 }));
+    };
+    socket.on('nuova_notifica_messaggio', handler);
+    return () => socket.off('nuova_notifica_messaggio', handler);
+  }, [user]);
+
+  // Socket: notifiche unificate (richiesta_match, match_accettato, messaggio)
+  useEffect(() => {
+    if (!user) return;
+    const socket = getSocket();
+    const handler = (notifica) => {
+      // Aggiunge alla lista storica (campanella)
+      setNotifiche(prev => {
+        if (prev.some(n => n.id === notifica.id)) return prev;
+        return [notifica, ...prev].slice(0, 50);
+      });
+
+      // Aggiorna lista richieste se è una richiesta_match
+      if (notifica.tipo === 'richiesta_match' && notifica.payload) {
+        const { interazioneId, intento, cane } = notifica.payload;
+        setRichieste(prev => {
+          if (prev.some(r => r.interazioneId === interazioneId)) return prev;
+          return [...prev, { interazioneId, intento, cane }];
+        });
+        setNotifications(prev => ({ ...prev, richieste: prev.richieste + 1 }));
+      }
+
+      // Toast auto-sparisce dopo 5 secondi
+      setToastRichiesta({ show: true, notifica });
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = setTimeout(
+        () => setToastRichiesta({ show: false, notifica: null }),
+        5000
+      );
+    };
+    socket.on('nuova_notifica', handler);
+    return () => {
+      socket.off('nuova_notifica', handler);
+      clearTimeout(toastTimerRef.current);
+    };
+  }, [user]);
+
+  const clearMsgNotifica = (interazioneId) => {
+    setMsgNotifiche(prev => {
+      const next = { ...prev };
+      delete next[interazioneId];
+      return next;
+    });
+    setNotifications(prev => ({ ...prev, messages: Math.max(0, prev.messages - 1) }));
+  };
+
+  const handleMarkNotificaRead = async (id) => {
+    setNotifiche(prev => prev.map(n => n.id === id ? { ...n, letto: true } : n));
+    segnaNotificaLetta(id).catch(() => {});
+  };
+
+  const handleMarkAllNotificheRead = async () => {
+    setNotifiche(prev => prev.map(n => ({ ...n, letto: true })));
+    segnaAllNotificheLette().catch(() => {});
+  };
+
+  const handleNotificaClick = (notifica) => {
+    handleMarkNotificaRead(notifica.id);
+    if (notifica.link === 'requests') {
+      setCurrentPage('requests');
+    } else if (notifica.link?.startsWith('chat:')) {
+      const interazioneId = notifica.link.split(':')[1];
+      const match = state.matches.find(m => String(m.interazioneId) === String(interazioneId));
+      if (match) apriChat(match);
+      else setCurrentPage('messages');
+    }
+  };
+
+  // Apri una specifica chat navigando verso messages
+  const apriChat = (match) => {
+    setSelectedMatchToOpen(match);
+    setCurrentPage("messages");
+  };
+
+  // Azzera il badge messaggi quando si entra nella pagina messages; pulisce la chat aperta quando si esce
+  useEffect(() => {
+    if (currentPage === "messages") {
+      setNotifications(prev => ({ ...prev, messages: 0 }));
+    } else {
+      chatApertaIdRef.current = null;
+    }
+  }, [currentPage]);
+
   // 4. Caricamento Feed dal Database
   useEffect(() => {
     const caricaFeedReale = async () => {
-      // 1. Se non siamo in home o l'utente non c'è, fermati
       if (currentPage !== "home" || !user) return;
 
       setLoading(true);
+      setFeedError(null);
       try {
-
         const caniUtente = user.iMieiCani || user.cani || [];
-        console.log("Dati utente attuale:", user);
         const mioCaneId = caniUtente.length > 0 ? caniUtente[0].id : null;
 
         if (!mioCaneId) {
-          console.log("Nessun cane trovato per questo utente");
           setDogs([]);
+          setFeedError("nessun_cane");
           setLoading(false);
           return;
         }
 
-        const response = await dogService.getDiscovery(mioCaneId);
-        // Assicuriamoci di prendere i dati corretti sia che usiamo fetch o axios
+        const response = await dogService.getDiscovery(mioCaneId, { intento: filtroIntento, distanza: filtroDistanza });
         const data = response.data || response;
 
         if (data.successo && data.cani) {
           const caniFormattati = data.cani.map(dog => {
             const rawFile = dog.fotoUrl || dog.foto_url || "";
             const nomeFile = rawFile.replace('uploads/', '').replace('/uploads/', '');
-
             return {
               ...dog,
               name: dog.nome,
-              photo: nomeFile
-                ? `/uploads/${nomeFile}`
-                : "https://via.placeholder.com/400",
+              photo: nomeFile ? `/uploads/${nomeFile}` : "https://via.placeholder.com/400",
               breed: dog.razza,
               distance: Math.floor(Math.random() * 20) + 1
             };
           });
           setDogs(caniFormattati);
+        } else {
+          setDogs([]);
+          setFeedError(data.errore || "errore_generico");
         }
       } catch (err) {
         console.error("Errore caricamento feed:", err);
+        setDogs([]);
+        setFeedError("errore_server");
       } finally {
         setLoading(false);
       }
     };
 
     caricaFeedReale();
-  }, [currentPage, user]);
+  }, [currentPage, user, filtroIntento, filtroDistanza]);
 
   // 5. Reducer per i Match
   const initialState = {
@@ -197,15 +317,17 @@ function App() {
       return;
     }
 
-    // Controllo compatibilità razza
-    const userBreed = user.iMieiCani?.[0]?.razza || "Meticcio";
-    if (selectedDogData.razza.toUpperCase() !== userBreed.toUpperCase()) {
-      alert(`RAZZA NON COMPATIBILE\n\nPuoi fare match solo con esemplari di razza ${userBreed}`);
-      return;
+    // Controllo compatibilità razza solo per accoppiamento
+    if (filtroIntento === 'accoppiamento') {
+      const userBreed = user.iMieiCani?.[0]?.razza || "Meticcio";
+      if ((selectedDogData.razza ?? '').toUpperCase() !== userBreed.toUpperCase()) {
+        alert(`RAZZA NON COMPATIBILE\n\nPer l'accoppiamento puoi fare match solo con esemplari di razza ${userBreed}`);
+        return;
+      }
     }
 
     try {
-      const result = await inviaLike(mioCaneId, dogId);
+      const result = await inviaLike(mioCaneId, dogId, filtroIntento || 'gioco');
 
       if (!result.successo) return;
 
@@ -292,11 +414,9 @@ function App() {
     localStorage.setItem("dogMatches", JSON.stringify(state.matches));
   }, [state.matches]);
 
-  // logica di blocco 
-  if (user && (user.status === 'banned' || user.isBanned)) {
-    return (
-      <BannedPage user={user} onLogout={handleLogout} />
-    )
+  // logica di blocco
+  if (user && user.isBanned) {
+    return <BannedPage user={user} onLogout={handleLogout} />;
   }
 
   return (
@@ -321,6 +441,9 @@ function App() {
             notifications={notifications}
             richieste={richieste}
             onNavigate={(page) => setCurrentPage(page)}
+            notifiche={notifiche}
+            onNotificaClick={handleNotificaClick}
+            onMarkAllRead={handleMarkAllNotificheRead}
           />
 
           <main className="container-fluid px-2 px-md-5 flex-grow-1 py-4">
@@ -333,7 +456,7 @@ function App() {
               />
             )}
 
-            {currentPage === "admin" && user?.isAdmin && (
+            {currentPage === "admin" && user?.ruolo === 'admin' && (
               <AdminPanel onBack={() => setCurrentPage("home")} />
             )}
 
@@ -354,12 +477,17 @@ function App() {
                   <Home
                     dogs={breed ? dogs.filter(d => d.razza?.toLowerCase().includes(breed.toLowerCase())) : dogs}
                     loading={loading}
+                    feedError={feedError}
                     breed={breed}
                     setBreed={setBreed}
                     setSelectedDog={setSelectedDog}
                     handleAcceptMatch={handleAcceptMatch}
                     handleRejectDog={handleRejectDog}
                     user={user}
+                    filtroIntento={filtroIntento}
+                    setFiltroIntento={setFiltroIntento}
+                    filtroDistanza={filtroDistanza}
+                    setFiltroDistanza={setFiltroDistanza}
                   />
                 </div>
 
@@ -373,7 +501,11 @@ function App() {
                         {state.matches.length === 0 ? (
                           <p className="text-muted mb-0 small text-center py-4">Ancora nessun match</p>
                         ) : (
-                          <MatchList matches={state.matches} />
+                          <MatchList
+                            matches={state.matches}
+                            msgNotifiche={msgNotifiche}
+                            onSelectMatch={apriChat}
+                          />
                         )}
                       </div>
                     </div>
@@ -383,7 +515,14 @@ function App() {
             )}
 
             {currentPage === "messages" && (
-              <Messaggi matches={state.matches} onBack={() => setCurrentPage('home')} />
+              <Messaggi
+                matches={state.matches}
+                onBack={() => { setCurrentPage('home'); setSelectedMatchToOpen(null); }}
+                msgNotifiche={msgNotifiche}
+                clearMsgNotifica={clearMsgNotifica}
+                initialMatch={selectedMatchToOpen}
+                onChatChange={(id) => { chatApertaIdRef.current = id; }}
+              />
             )}
           </main>
 
@@ -398,6 +537,30 @@ function App() {
           )}
           {showMatchAlert && <MatchAnimation />}
           <SnoutBot />
+
+          {/* Toast: notifica in tempo reale */}
+          {toastRichiesta.show && toastRichiesta.notifica && (
+            <div className="position-fixed bottom-0 end-0 p-3" style={{ zIndex: 9999 }}>
+              <div
+                className="d-flex align-items-center gap-3 px-3 py-2 shadow-lg text-white"
+                style={{ backgroundColor: '#EFA6BA', borderRadius: '14px', minWidth: '260px', maxWidth: '320px' }}
+              >
+                <i className="bi bi-bell-fill flex-shrink-0" style={{ fontSize: '1.2rem' }} />
+                <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                  <div className="fw-bold" style={{ fontSize: '0.85rem' }}>Nuova notifica</div>
+                  <div className="text-truncate" style={{ fontSize: '0.75rem', opacity: 0.9 }}>
+                    {toastRichiesta.notifica.messaggio}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn-close btn-close-white flex-shrink-0"
+                  style={{ fontSize: '0.6rem' }}
+                  onClick={() => setToastRichiesta({ show: false, notifica: null })}
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
     </>
