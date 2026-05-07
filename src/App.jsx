@@ -1,6 +1,7 @@
 import { useEffect, useState, useReducer, useRef, useCallback } from "react";
 import dogReducer from "./store/reducers/dogReducer";
 import MatchList from "./components/ListaRichieste";
+import AdminMatchSidebar from "./components/AdminMatchSidebar";
 import InfoCane from "./modal/InfoCane";
 import Navbar from "./components/Navbar";
 import MatchAnimation from "./components/MatchAnimation";
@@ -65,17 +66,15 @@ function App() {
   }, []);
 
   // Polling richieste ricevute
-  const aggiornaSollecitiRichieste = useCallback(async (userData) => {
-    const caneId = (userData ?? user)?.iMieiCani?.[0]?.id;
-    if (!caneId) return;
+  const aggiornaSollecitiRichieste = useCallback(async () => {
     try {
-      const data = await getRichiesteRicevute(caneId);
+      const data = await getRichiesteRicevute();
       if (data.successo) {
         setRichieste(data.richieste ?? []);
         setNotifications(prev => ({ ...prev, richieste: (data.richieste ?? []).length }));
       }
     } catch { /* silent */ }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -116,8 +115,8 @@ function App() {
     }
 
     // Polling richieste
-    aggiornaSollecitiRichieste(user);
-    pollingRef.current = setInterval(() => aggiornaSollecitiRichieste(user), 30000);
+    aggiornaSollecitiRichieste();
+    pollingRef.current = setInterval(() => aggiornaSollecitiRichieste(), 30000);
 
     // Carica notifiche storiche (copre notifiche ricevute offline)
     fetchNotifiche().then(d => { if (d.successo) setNotifiche(d.notifiche); }).catch(() => {});
@@ -169,6 +168,7 @@ function App() {
     if (!user) return;
     const socket = getSocket();
     const handler = (notifica) => {
+      console.log('[Socket] nuova_notifica ricevuta:', notifica.tipo, notifica.messaggio);
       // Aggiunge alla lista storica (campanella)
       setNotifiche(prev => {
         if (prev.some(n => n.id === notifica.id)) return prev;
@@ -185,6 +185,23 @@ function App() {
         setNotifications(prev => ({ ...prev, richieste: prev.richieste + 1 }));
       }
 
+      // Suono ping via Web Audio API
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        [[880, 0, 0.18], [1100, 0.12, 0.18]].forEach(([freq, delay, dur]) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.type = 'sine';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.22, ctx.currentTime + delay);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + dur);
+          osc.start(ctx.currentTime + delay);
+          osc.stop(ctx.currentTime + delay + dur);
+        });
+      } catch { /* audio non supportato */ }
+
       // Toast auto-sparisce dopo 5 secondi
       setToastRichiesta({ show: true, notifica });
       clearTimeout(toastTimerRef.current);
@@ -198,6 +215,33 @@ function App() {
       socket.off('nuova_notifica', handler);
       clearTimeout(toastTimerRef.current);
     };
+  }, [user]);
+
+  // Socket: notifiche di sistema solo per admin (nuovo utente, nuovo cane, ecc.)
+  useEffect(() => {
+    if (!user || user.ruolo !== 'admin') return;
+    const socket = getSocket();
+    const handler = (notifica) => {
+      const entry = { id: `sys_${Date.now()}`, letto: false, ...notifica };
+      setNotifiche(prev => [entry, ...prev].slice(0, 50));
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        [[660, 0, 0.15], [880, 0.1, 0.15]].forEach(([freq, delay, dur]) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.type = 'sine'; osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.18, ctx.currentTime + delay);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + dur);
+          osc.start(ctx.currentTime + delay); osc.stop(ctx.currentTime + delay + dur);
+        });
+      } catch { /* audio non supportato */ }
+      setToastRichiesta({ show: true, notifica: entry });
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = setTimeout(() => setToastRichiesta({ show: false, notifica: null }), 5000);
+    };
+    socket.on('notifica_admin', handler);
+    return () => { socket.off('notifica_admin', handler); };
   }, [user]);
 
   const clearMsgNotifica = (interazioneId) => {
@@ -488,27 +532,32 @@ function App() {
                     setFiltroIntento={setFiltroIntento}
                     filtroDistanza={filtroDistanza}
                     setFiltroDistanza={setFiltroDistanza}
+                    onNavigate={(page) => setCurrentPage(page)}
                   />
                 </div>
 
                 <div className="col-xl-3 col-lg-4">
                   <div className="sticky-top" style={{ top: "90px" }}>
-                    <div className="bg-white rounded-4 shadow-sm p-3 border-0">
-                      <h6 className="fw-bold mb-3 border-bottom pb-2 text-secondary">
-                        Match ({state.matches.length})
-                      </h6>
-                      <div style={{ maxHeight: "70vh", overflowY: "auto" }}>
-                        {state.matches.length === 0 ? (
-                          <p className="text-muted mb-0 small text-center py-4">Ancora nessun match</p>
-                        ) : (
-                          <MatchList
-                            matches={state.matches}
-                            msgNotifiche={msgNotifiche}
-                            onSelectMatch={apriChat}
-                          />
-                        )}
+                    {user?.ruolo === 'admin' ? (
+                      <AdminMatchSidebar />
+                    ) : (
+                      <div className="bg-white rounded-4 shadow-sm p-3 border-0">
+                        <h6 className="fw-bold mb-3 border-bottom pb-2 text-secondary">
+                          I tuoi Match ({state.matches.length})
+                        </h6>
+                        <div style={{ maxHeight: "70vh", overflowY: "auto" }}>
+                          {state.matches.length === 0 ? (
+                            <p className="text-muted mb-0 small text-center py-4">Ancora nessun match</p>
+                          ) : (
+                            <MatchList
+                              matches={state.matches}
+                              msgNotifiche={msgNotifiche}
+                              onSelectMatch={apriChat}
+                            />
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               </div>

@@ -1,7 +1,9 @@
 const TIPO_CONFIG = {
-  richiesta_match: { icon: 'bi-heart-arrow',      color: '#EFA6BA', label: 'Richiesta' },
-  match_accettato: { icon: 'bi-stars',             color: '#7FBCC8', label: 'Match!'    },
-  messaggio:       { icon: 'bi-chat-dots-fill',    color: '#56b4c9', label: 'Messaggio' }
+  richiesta_match: { icon: 'bi-heart-arrow',      color: '#EFA6BA', label: 'Richiesta'  },
+  match_accettato: { icon: 'bi-stars',             color: '#7FBCC8', label: 'Match!'     },
+  messaggio:       { icon: 'bi-chat-dots-fill',    color: '#56b4c9', label: 'Messaggio'  },
+  nuovo_utente:    { icon: 'bi-person-plus-fill',  color: '#28a745', label: 'Nuovo utente' },
+  nuovo_cane:      { icon: 'bi-balloon-heart-fill',color: '#EFA6BA', label: 'Nuovo cane'   },
 };
 
 const formatOra = (dateStr) => {

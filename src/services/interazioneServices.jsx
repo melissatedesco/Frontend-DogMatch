@@ -5,9 +5,9 @@ const getAuthHeader = () => ({
     'Content-Type': 'application/json'
 });
 
-export const getRichiesteRicevute = async (mioCaneId) => {
+export const getRichiesteRicevute = async () => {
     try {
-        const response = await fetch(`${API_URL}/ricevuti/${mioCaneId}`, {
+        const response = await fetch(`${API_URL}/richieste-ricevute`, {
             headers: getAuthHeader()
         });
         if (!response.ok) throw new Error('Errore nel recupero richieste');

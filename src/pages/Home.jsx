@@ -1,3 +1,4 @@
+import AdminHome from "./AdminHome";
 import MatchRequestCard from "../components/MatchCane"
 import BreedSelector from "../data/Razza"
 
@@ -44,7 +45,11 @@ const emptyMessage = (breed, setBreed, feedError) => {
 };
 
 const Home = ({ dogs, loading, feedError, breed, setBreed, setSelectedDog, handleAcceptMatch, handleRejectDog, user,
-                filtroIntento, setFiltroIntento, filtroDistanza, setFiltroDistanza }) => {
+                filtroIntento, setFiltroIntento, filtroDistanza, setFiltroDistanza, onNavigate }) => {
+
+    if (user?.ruolo === 'admin') {
+        return <AdminHome onNavigate={onNavigate} />;
+    }
 
     return (
         <div className="container-fluid p-0">
