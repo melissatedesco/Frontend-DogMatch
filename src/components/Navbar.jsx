@@ -1,12 +1,12 @@
 import logo from "../assets/logo.png";
 import NotificationDropdown from "./NotificationDropdown";
 
-const Navbar = ({ user, onLogout, notifications, onNavigate, notifiche = [], onNotificaClick, onMarkAllRead }) => {
+const Navbar = ({ user, onLogout, notifications, onNavigate, notifiche = [], richieste = [], onNotificaClick, onMarkAllRead, onAccettaRichiesta, onRifiutaRichiesta, onViewProfilo }) => {
 
   return (
     <nav
       className="navbar navbar-light shadow-sm bg-white sticky-top mb-4"
-      style={{ borderRadius: "0 0 20px 20px", borderBottom: "3px solid #7FBCC8" }}
+      style={{ borderRadius: "0 0 20px 20px", borderBottom: "3px solid #7FBCC8", zIndex: 1100 }}
     >
       <div className="container d-flex align-items-center flex-nowrap">
 
@@ -58,8 +58,12 @@ const Navbar = ({ user, onLogout, notifications, onNavigate, notifiche = [], onN
           {/* Centro notifiche */}
           <NotificationDropdown
             notifiche={notifiche}
+            richieste={richieste}
             onNotificaClick={onNotificaClick}
             onMarkAllRead={onMarkAllRead}
+            onAccetta={onAccettaRichiesta}
+            onRifiuta={onRifiutaRichiesta}
+            onViewProfilo={onViewProfilo}
           />
 
           {/* Logout */}

@@ -209,7 +209,7 @@ const AdminPanel = ({ onBack }) => {
           <div className="d-flex flex-column gap-2">
             {filteredUtenti.map(utente => {
               const cane        = utente.iMieiCani?.[0];
-              const hasPedigree = (cane?.documenti?.length ?? 0) > 0;
+              const hasPedigree = !!(cane?.pedigreeUrl ?? cane?.pedigree_url);
               const borderColor = utente.isBloccato ? "#f5c6cb" : utente.isVerificato ? "#c3e6cb" : hasPedigree ? "#ffc107" : "#e9ecef";
 
               return (
@@ -335,7 +335,7 @@ const AdminPanel = ({ onBack }) => {
         ) : (
           <div className="d-flex flex-column gap-2">
             {filteredCani.map(cane => {
-              const hasPedigree = (cane.documenti?.length ?? 0) > 0;
+              const hasPedigree = !!(cane.pedigreeUrl ?? cane.pedigree_url);
 
               return (
                 <div key={cane.id}

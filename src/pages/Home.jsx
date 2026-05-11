@@ -2,11 +2,12 @@ import { useState } from "react";
 import AdminHome from "./AdminHome";
 import MatchRequestCard from "../components/MatchCane";
 import BarraRicercaRazza from "../components/BarraRicercaRazza";
+import MappaRicerca from "../components/MappaRicerca";
 
 const INTENTI = [
     { value: "",              label: "Tutti" },
     { value: "gioco",         label: "Gioco" },
-    { value: "accoppiamento", label: "Accoppiamento" },
+    { value: "accoppiamento", label: "Cerca compagno" },
 ];
 
 const DISTANZE_BASE = [
@@ -67,7 +68,7 @@ const NoCanePrompt = ({ onNavigate }) => (
 );
 
 /* ── Stato "nessun risultato" ── */
-const EmptyFeed = ({ feedError, caneRazza }) => {
+const EmptyFeed = ({ feedError, caneRazza, filtroIntento }) => {
     if (feedError === "errore_server") {
         return (
             <div className="text-center py-5 text-muted">
@@ -77,23 +78,36 @@ const EmptyFeed = ({ feedError, caneRazza }) => {
             </div>
         );
     }
-    const razza = caneRazza || "cani della stessa razza";
+    if (filtroIntento === 'accoppiamento') {
+        const razza = caneRazza || "cani della stessa razza";
+        return (
+            <div className="text-center py-5 text-muted">
+                <div style={{ fontSize: "3.5rem", marginBottom: "0.75rem", opacity: 0.6 }}>🐕</div>
+                <p className="fw-semibold mb-1">Nessun {razza} compatibile nei paraggi</p>
+                <p className="small">
+                    Al momento non ci sono altri <strong>{razza}</strong> di sesso opposto disponibili.
+                    <br />Prova a cambiare zona o invita un amico!
+                </p>
+            </div>
+        );
+    }
     return (
         <div className="text-center py-5 text-muted">
             <div style={{ fontSize: "3.5rem", marginBottom: "0.75rem", opacity: 0.6 }}>🐕</div>
-            <p className="fw-semibold mb-1">Nessun {razza} nei paraggi</p>
+            <p className="fw-semibold mb-1">Nessun cane disponibile</p>
             <p className="small">
-                Al momento non ci sono altri <strong>{razza}</strong> disponibili nella tua zona.
-                <br />Prova a cambiare zona o invita un amico!
+                Non ci sono altri cani da scoprire in questo momento.
+                <br />Prova a cambiare filtro o invita un amico!
             </p>
         </div>
     );
 };
 
-const Home = ({ dogs, loading, feedError, setSelectedDog, handleAcceptMatch, user,
+const Home = ({ dogs, loading, feedError, setSelectedDog, handleAcceptMatch, handlePlayClick, user,
                 filtroIntento, setFiltroIntento, filtroDistanza, setFiltroDistanza, onNavigate,
                 hasLocation, selectedCaneIdx, onSwitchCane }) => {
     const [localSearch, setLocalSearch] = useState("");
+    const [vistaM, setVistaM] = useState("lista"); // "lista" | "mappa"
 
     if (user?.ruolo === 'admin') {
         return <AdminHome onNavigate={onNavigate} />;
@@ -163,27 +177,59 @@ const Home = ({ dogs, loading, feedError, setSelectedDog, handleAcceptMatch, use
                 </div>
             </div>
 
-            {/* Titolo + barra ricerca razza */}
+            {/* Titolo + toggle vista + barra ricerca */}
             <div className="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
-                {caneRazza && (
-                    <h4 className="fw-bold mb-0">
-                        {caneRazza}{" "}
-                        <span className="fw-normal text-muted" style={{ fontSize: "1rem" }}>nella tua zona</span>
-                    </h4>
-                )}
-                <BarraRicercaRazza
-                    caneRazza={caneRazza}
-                    isAdmin={false}
-                    onSearch={setLocalSearch}
-                />
+                <h4 className="fw-bold mb-0">
+                    {filtroIntento === 'accoppiamento' && caneRazza
+                        ? <>{caneRazza} <span className="fw-normal text-muted" style={{ fontSize: "1rem" }}>— cerca compagno</span></>
+                        : <span className="text-muted fw-normal" style={{ fontSize: "1rem" }}>Scopri nuovi amici</span>
+                    }
+                </h4>
+                <div className="d-flex align-items-center gap-2">
+                    {/* Toggle Lista / Mappa */}
+                    <div className="d-flex rounded-pill overflow-hidden" style={{ border: "1.5px solid #e0eef2" }}>
+                        {[{ v: "lista", icon: "bi-grid-3x3-gap-fill" }, { v: "mappa", icon: "bi-map-fill" }].map(({ v, icon }) => (
+                            <button
+                                key={v}
+                                onClick={() => setVistaM(v)}
+                                style={{
+                                    padding: "5px 14px",
+                                    border: "none",
+                                    backgroundColor: vistaM === v ? "#7FBCC8" : "white",
+                                    color: vistaM === v ? "white" : "#8A9A9D",
+                                    fontSize: "0.82rem",
+                                    fontWeight: 600,
+                                    cursor: "pointer",
+                                    transition: "all 0.15s",
+                                }}
+                            >
+                                <i className={`bi ${icon}`} />
+                            </button>
+                        ))}
+                    </div>
+                    {vistaM === "lista" && (
+                        <BarraRicercaRazza
+                            caneRazza={caneRazza}
+                            isAdmin={false}
+                            onSearch={setLocalSearch}
+                        />
+                    )}
+                </div>
             </div>
 
             {loading ? (
                 <div className="text-center py-5">
                     <div className="spinner-border" style={{ color: "#EFA6BA" }} />
                 </div>
+            ) : vistaM === "mappa" ? (
+                <MappaRicerca
+                    dogs={dogs}
+                    activeDog={activeCane}
+                    onAccept={handleAcceptMatch}
+                    onPlay={handlePlayClick}
+                />
             ) : dogs.length === 0 ? (
-                <EmptyFeed feedError={feedError} caneRazza={caneRazza} />
+                <EmptyFeed feedError={feedError} caneRazza={caneRazza} filtroIntento={filtroIntento} />
             ) : (
                 <div className="row g-4">
                     {dogs
@@ -195,8 +241,10 @@ const Home = ({ dogs, loading, feedError, setSelectedDog, handleAcceptMatch, use
                         <div className="col-12 col-md-6 col-lg-4" key={dog.id}>
                             <MatchRequestCard
                                 dog={dog}
+                                activeDog={activeCane}
                                 onView={(dog) => setSelectedDog(dog)}
                                 onAccept={() => handleAcceptMatch(dog.id)}
+                                onPlay={() => handlePlayClick(dog.id)}
                             />
                         </div>
                     ))}

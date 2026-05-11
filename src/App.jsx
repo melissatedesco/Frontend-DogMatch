@@ -6,6 +6,7 @@ import InfoCane from "./modal/InfoCane";
 import Navbar from "./components/Navbar";
 import MatchAnimation from "./components/MatchAnimation";
 import UserProfilo from "./pages/UserProfilo";
+import ViewProfiloUtente from "./pages/ViewProfiloUtente";
 import AdminPanel from "./pages/AdminPanel";
 import PrimaPagina from "./pages/PrimaPage";
 import Login from "./pages/Login";
@@ -31,6 +32,7 @@ function App() {
   const [filtroDistanza, setFiltroDistanza] = useState("");
   const [userLocation, setUserLocation] = useState(null);
   const [selectedCaneIdx, setSelectedCaneIdx] = useState(0);
+  const [viewProfileId, setViewProfileId] = useState(null);
   const [showMatchAlert, setShowMatchAlert] = useState(false);
   const [currentPage, setCurrentPage] = useState("landing");
   const [user, setUser] = useState(null); // Parte come null
@@ -351,7 +353,10 @@ function App() {
               name: dog.nome,
               photo: nomeFile ? `/uploads/${nomeFile}` : "https://via.placeholder.com/400",
               breed: dog.razza,
-              distance: dog.distanza_km != null ? parseFloat(dog.distanza_km) : null
+              distance: dog.distanza_km != null ? parseFloat(dog.distanza_km) : null,
+              lat: dog.proprietario?.latitudine ?? null,
+              lng: dog.proprietario?.longitudine ?? null,
+              proprietarioNome: dog.proprietario?.nome ?? null,
             };
           });
           setDogs(caniFormattati);
@@ -388,9 +393,8 @@ function App() {
   const [state, dispatch] = useReducer(dogReducer, initialState);
 
   // 6. Logica Match
-  const handleAcceptMatch = async (dogId) => {
+  const sendLike = async (dogId, intento) => {
     const selectedDogData = dogs.find((d) => d.id === dogId);
-
     if (!selectedDogData || !user) return;
 
     const caniUtente = user.iMieiCani || user.cani || [];
@@ -401,8 +405,7 @@ function App() {
     }
 
     try {
-      const result = await inviaLike(mioCaneId, dogId, filtroIntento || 'gioco');
-
+      const result = await inviaLike(mioCaneId, dogId, intento);
       if (!result.successo) return;
 
       setDogs((prev) => prev.filter((d) => d.id !== dogId));
@@ -415,14 +418,18 @@ function App() {
         };
         dispatch({ type: "AGGIUNGI_MATCH_DIRETTO", payload: matchDog });
         triggerMatchAnimation();
-        setTimeout(() => {
-          setCurrentPage("messages");
-        }, 2000);
+        setTimeout(() => { setCurrentPage("messages"); }, 2000);
       }
     } catch (err) {
       console.error("Errore durante il like:", err);
     }
   };
+
+  // Match (accoppiamento) — solo per cani compatibili
+  const handleAcceptMatch = (dogId) => sendLike(dogId, 'accoppiamento');
+
+  // Gioco — disponibile per tutti i cani
+  const handlePlayClick = (dogId) => sendLike(dogId, 'gioco');
 
 
   const triggerMatchAnimation = () => {
@@ -497,7 +504,7 @@ function App() {
         />
       )}
 
-      {["home", "profile", "messages", "admin", "requests"].includes(currentPage) && user && (
+      {["home", "profile", "messages", "admin", "requests", "viewProfile"].includes(currentPage) && user && (
         <div className="d-flex flex-column min-vh-100" style={{ backgroundColor: "#f8fbfb" }}>
           <Navbar
             user={user}
@@ -508,6 +515,9 @@ function App() {
             notifiche={notifiche}
             onNotificaClick={handleNotificaClick}
             onMarkAllRead={handleMarkAllNotificheRead}
+            onAccettaRichiesta={handleAccettaRichiesta}
+            onRifiutaRichiesta={handleRifiutaRichiesta}
+            onViewProfilo={(utenteId) => { setViewProfileId(utenteId); setCurrentPage("viewProfile"); }}
           />
 
           <main className="container-fluid px-2 px-md-5 flex-grow-1 py-4">
@@ -535,6 +545,13 @@ function App() {
               />
             )}
 
+            {currentPage === "viewProfile" && viewProfileId && (
+              <ViewProfiloUtente
+                utenteId={viewProfileId}
+                onBack={() => setCurrentPage("home")}
+              />
+            )}
+
             {currentPage === "home" && (
               <div className="row g-3 g-lg-4">
                 <div className="col-xl-9 col-lg-8">
@@ -544,6 +561,7 @@ function App() {
                     feedError={feedError}
                     setSelectedDog={setSelectedDog}
                     handleAcceptMatch={handleAcceptMatch}
+                    handlePlayClick={handlePlayClick}
                     user={user}
                     filtroIntento={filtroIntento}
                     setFiltroIntento={setFiltroIntento}
@@ -607,29 +625,110 @@ function App() {
           {showMatchAlert && <MatchAnimation />}
           <SnoutBot />
 
-          {/* Toast: notifica in tempo reale */}
-          {toastRichiesta.show && toastRichiesta.notifica && (
-            <div className="position-fixed bottom-0 end-0 p-3" style={{ zIndex: 9999 }}>
-              <div
-                className="d-flex align-items-center gap-3 px-3 py-2 shadow-lg text-white"
-                style={{ backgroundColor: '#EFA6BA', borderRadius: '14px', minWidth: '260px', maxWidth: '320px' }}
-              >
-                <i className="bi bi-bell-fill flex-shrink-0" style={{ fontSize: '1.2rem' }} />
-                <div className="flex-grow-1" style={{ minWidth: 0 }}>
-                  <div className="fw-bold" style={{ fontSize: '0.85rem' }}>Nuova notifica</div>
-                  <div className="text-truncate" style={{ fontSize: '0.75rem', opacity: 0.9 }}>
-                    {toastRichiesta.notifica.messaggio}
+          {/* Toast: notifica interattiva in tempo reale */}
+          {toastRichiesta.show && toastRichiesta.notifica && (() => {
+            const n = toastRichiesta.notifica;
+            const isRichiesta = n.tipo === 'richiesta_match' && n.payload;
+            const payload = n.payload;
+            const pendingRichiesta = isRichiesta
+              ? richieste.find(r => r.interazioneId === payload.interazioneId)
+              : null;
+            const caneImg = (pendingRichiesta?.cane?.fotoUrl ?? payload?.cane?.fotoUrl)
+              ? (() => {
+                  const raw = pendingRichiesta?.cane?.fotoUrl ?? payload?.cane?.fotoUrl;
+                  if (raw.startsWith('http')) return raw;
+                  return `/uploads/${raw.replace('uploads/', '').replace('/uploads/', '')}`;
+                })()
+              : null;
+            const caneName = pendingRichiesta?.cane?.nome ?? payload?.cane?.nome;
+            const intentoText = (pendingRichiesta?.intento ?? payload?.intento) === 'accoppiamento'
+              ? 'un Match' : 'giocare insieme';
+            const dismiss = () => setToastRichiesta({ show: false, notifica: null });
+
+            return (
+              <div className="position-fixed bottom-0 end-0 p-3" style={{ zIndex: 9999 }}>
+                <div className="shadow-lg" style={{
+                  backgroundColor: 'white', borderRadius: '18px', width: '320px',
+                  border: '1.5px solid #f0e0e8', overflow: 'hidden',
+                  animation: 'slideInUp 0.25s ease-out',
+                }}>
+                  {/* Barra superiore */}
+                  <div
+                    className="d-flex align-items-center justify-content-between px-3 py-2"
+                    style={{ background: isRichiesta ? 'linear-gradient(90deg, #EFA6BA, #7FBCC8)' : '#7FBCC8' }}
+                  >
+                    <div className="d-flex align-items-center gap-2 text-white">
+                      <i className="bi bi-bell-fill" style={{ fontSize: '0.85rem' }} />
+                      <span className="fw-bold" style={{ fontSize: '0.82rem' }}>
+                        {isRichiesta ? 'Nuova richiesta' : 'Notifica'}
+                      </span>
+                    </div>
+                    <button className="btn-close btn-close-white" style={{ fontSize: '0.6rem' }} onClick={dismiss} />
+                  </div>
+
+                  {/* Corpo */}
+                  <div className="px-3 py-3">
+                    {isRichiesta ? (
+                      <>
+                        {/* Foto + nome + messaggio */}
+                        <div className="d-flex align-items-center gap-2 mb-3">
+                          {caneImg ? (
+                            <img
+                              src={caneImg}
+                              alt={caneName}
+                              onError={(e) => { e.target.src = 'https://cdn-icons-png.flaticon.com/512/616/616408.png'; }}
+                              style={{ width: '52px', height: '52px', borderRadius: '50%', objectFit: 'cover', border: '2.5px solid #EFA6BA', flexShrink: 0 }}
+                            />
+                          ) : (
+                            <div style={{ width: '52px', height: '52px', borderRadius: '50%', backgroundColor: '#fef6f8', border: '2px solid #EFA6BA', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <i className="bi bi-heart-fill" style={{ color: '#EFA6BA', fontSize: '1.4rem' }} />
+                            </div>
+                          )}
+                          <div>
+                            {caneName && (
+                              <div className="fw-bold" style={{ fontSize: '0.9rem', color: '#1c1e21' }}>{caneName}</div>
+                            )}
+                            <div style={{ fontSize: '0.78rem', color: '#777' }}>
+                              vorrebbe {intentoText} con il tuo cane!
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Bottoni azione */}
+                        <div className="d-flex gap-2">
+                          <button
+                            className="btn btn-sm rounded-pill fw-bold text-white flex-grow-1"
+                            style={{ backgroundColor: '#28a745', border: 'none', fontSize: '0.82rem' }}
+                            onClick={() => {
+                              if (pendingRichiesta) handleAccettaRichiesta(pendingRichiesta);
+                              dismiss();
+                            }}
+                          >
+                            <i className="bi bi-check-lg me-1" />Accetta
+                          </button>
+                          <button
+                            className="btn btn-sm rounded-pill fw-bold flex-grow-1"
+                            style={{ backgroundColor: '#fff3f3', color: '#dc3545', border: '1.5px solid #f5c6cb', fontSize: '0.82rem' }}
+                            onClick={() => {
+                              if (pendingRichiesta) handleRifiutaRichiesta(pendingRichiesta);
+                              dismiss();
+                            }}
+                          >
+                            <i className="bi bi-x-lg me-1" />Rifiuta
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="d-flex align-items-center gap-2">
+                        <i className="bi bi-bell text-muted" style={{ fontSize: '1.1rem' }} />
+                        <div style={{ fontSize: '0.82rem', color: '#555' }}>{n.messaggio}</div>
+                      </div>
+                    )}
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className="btn-close btn-close-white flex-shrink-0"
-                  style={{ fontSize: '0.6rem' }}
-                  onClick={() => setToastRichiesta({ show: false, notifica: null })}
-                />
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       )}
     </>

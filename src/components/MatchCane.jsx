@@ -4,9 +4,17 @@ const formatDistanza = (km) => {
   return `A ${Math.round(km)} km da te`;
 };
 
-function MatchRequestCard({ dog, onAccept, onView }) {
+function MatchRequestCard({ dog, onAccept, onPlay, onView, activeDog }) {
   const distanzaLabel = formatDistanza(dog.distance);
   const hasPedigree = !!(dog.pedigreeUrl || dog.pedigree_url);
+
+  // Compatibile per il match se stessa razza e sesso opposto
+  const isMatchCompatible =
+    activeDog &&
+    dog.breed === activeDog.razza &&
+    dog.sesso &&
+    activeDog.sesso &&
+    dog.sesso !== activeDog.sesso;
 
   return (
     <div
@@ -53,6 +61,18 @@ function MatchRequestCard({ dog, onAccept, onView }) {
             </span>
           </div>
         )}
+
+        {/* Badge compatibilità match — in alto a sinistra */}
+        {isMatchCompatible && (
+          <div className="position-absolute top-0 start-0 m-2" style={{ zIndex: 2 }}>
+            <span
+              className="badge rounded-pill px-2 py-1 fw-semibold"
+              style={{ backgroundColor: "rgba(40,167,69,0.88)", color: "white", fontSize: "0.65rem" }}
+            >
+              <i className="bi bi-heart-fill me-1" />Compatibile
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Body */}
@@ -78,32 +98,62 @@ function MatchRequestCard({ dog, onAccept, onView }) {
           </p>
         )}
 
-        {/* Pulsante Match — prominente, in fondo alla card */}
-        <button
-          className="btn fw-bold text-white mt-auto w-100 rounded-pill"
-          style={{
-            backgroundColor: "#28a745",
-            border: "none",
-            padding: "0.7rem 1rem",
-            fontSize: "0.95rem",
-            letterSpacing: "0.02em",
-            boxShadow: "0 4px 14px rgba(40,167,69,0.4)",
-            marginTop: "8px",
-            transition: "background-color 0.15s, box-shadow 0.15s"
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.backgroundColor = "#1e7e34";
-            e.currentTarget.style.boxShadow = "0 6px 18px rgba(30,126,52,0.45)";
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.backgroundColor = "#28a745";
-            e.currentTarget.style.boxShadow = "0 4px 14px rgba(40,167,69,0.4)";
-          }}
-          onClick={() => onAccept(dog.id)}
-        >
-          <i className="bi bi-stars me-2" />Match
-        </button>
+        {/* Pulsanti azione */}
+        <div className="d-flex flex-column gap-2 mt-auto" style={{ marginTop: "8px" }}>
 
+          {/* Pulsante Gioca — sempre visibile */}
+          <button
+            className="btn fw-bold text-white w-100 rounded-pill"
+            style={{
+              backgroundColor: "#7FBCC8",
+              border: "none",
+              padding: "0.6rem 1rem",
+              fontSize: "0.9rem",
+              letterSpacing: "0.02em",
+              boxShadow: "0 4px 14px rgba(127,188,200,0.4)",
+              transition: "background-color 0.15s, box-shadow 0.15s"
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.backgroundColor = "#5ea8b8";
+              e.currentTarget.style.boxShadow = "0 6px 18px rgba(94,168,184,0.45)";
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.backgroundColor = "#7FBCC8";
+              e.currentTarget.style.boxShadow = "0 4px 14px rgba(127,188,200,0.4)";
+            }}
+            onClick={() => onPlay(dog.id)}
+          >
+            <i className="bi bi-balloon-heart me-2" />Gioca!
+          </button>
+
+          {/* Pulsante Match — solo se compatibile per accoppiamento */}
+          {isMatchCompatible && (
+            <button
+              className="btn fw-bold text-white w-100 rounded-pill"
+              style={{
+                backgroundColor: "#28a745",
+                border: "none",
+                padding: "0.7rem 1rem",
+                fontSize: "0.95rem",
+                letterSpacing: "0.02em",
+                boxShadow: "0 4px 14px rgba(40,167,69,0.4)",
+                transition: "background-color 0.15s, box-shadow 0.15s"
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.backgroundColor = "#1e7e34";
+                e.currentTarget.style.boxShadow = "0 6px 18px rgba(30,126,52,0.45)";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.backgroundColor = "#28a745";
+                e.currentTarget.style.boxShadow = "0 4px 14px rgba(40,167,69,0.4)";
+              }}
+              onClick={() => onAccept(dog.id)}
+            >
+              <i className="bi bi-stars me-2" />Match
+            </button>
+          )}
+
+        </div>
       </div>
     </div>
   );
