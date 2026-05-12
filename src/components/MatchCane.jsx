@@ -4,7 +4,7 @@ const formatDistanza = (km) => {
   return `A ${Math.round(km)} km da te`;
 };
 
-function MatchRequestCard({ dog, onAccept, onPlay, onView, activeDog }) {
+function MatchRequestCard({ dog, onAccept, onPlay, onView, activeDog, isOnline = false }) {
   const distanzaLabel = formatDistanza(dog.distance);
   const hasPedigree = !!(dog.pedigreeUrl || dog.pedigree_url);
 
@@ -30,6 +30,16 @@ function MatchRequestCard({ dog, onAccept, onPlay, onView, activeDog }) {
           className="card-img-top"
           alt={dog.name}
           style={{ height: "210px", objectFit: "cover" }}
+        />
+
+        {/* Indicatore online */}
+        <span
+          className="position-absolute top-0 end-0 m-2 rounded-circle border border-white"
+          style={{
+            width: "13px", height: "13px", zIndex: 3,
+            backgroundColor: isOnline ? "#28c76f" : "#adb5bd",
+            display: "block",
+          }}
         />
 
         {/* Badge distanza — in basso a sinistra sull'immagine */}
@@ -83,103 +93,11 @@ function MatchRequestCard({ dog, onAccept, onPlay, onView, activeDog }) {
           <div className="text-muted small">{dog.breed}</div>
         </div>
 
-<<<<<<< HEAD
         <div className="text-muted small">
           {dog.eta != null ? `${dog.eta} ${dog.eta === 1 ? "anno" : "anni"}` : ""}
           {dog.sesso ? ` · ${dog.sesso === "M" ? "Maschio" : "Femmina"}` : ""}
           {dog.taglia ? ` · Taglia ${dog.taglia}` : ""}
         </div>
-=======
-              <div>
-
-                <h6 className="fw-bold mb-0"
-
-                style={{
-
-                  fontSize: '1.1rem'
-
-                }}>{dog.name}</h6>
-
-                <div className="text-muted small">
-
-                  {dog.breed}
-
-                </div>
-
-              </div>
-
-              <div className="text-muted small">
-
-                <i className="bi bi-geo-alt-fill text-bg-danger me-1"></i>
-
-                {dog.distance}
-
-              </div>
-
-               </div>
-
-
-
-              <div className="text-muted small mb-3"> 2 anni </div>
-
-
-
-                {/* tag piccoli grigi */}
-
-                <div className="d-flex gap-1 mb-3">
-
-                  <span className="badge bg-light text-muted border rounded-pill px-2 py-1"
-
-                  style={{
-
-                    fontSize: '0.6rem',
-
-                    fontWeight: '500'
-
-                  }}>
-
-                    <i className="bi bi-check-fill text-success me-1"></i>
-
-                    Pedigree
-
-                  </span>
-
-
-
-                  <span className="badge bg-light text-muted border rounded-pill px-2 py-1"
-
-                   style={{
-
-                    fontSize: '0.6rem',
-
-                    fontWeight: '500'
-
-                  }}>
-
-                    <i className="bi bi-check-fill text-success me-1"></i>
-
-                    Genetica
-
-                  </span>
-
-                </div>
-
-             
-
-              {/* pulsanti azione */}
-
-               <div className="d-flex gap-2">
-
-
-
-                 
-
-          <button
-
-            className="btn btn-outline-light text-dark border flex-grow-1 rounded-pill btn-sm fw-bold"
-
-            onClick={() => onReject(dog.id)}
->>>>>>> main
 
         {dog.descrizione && (
           <p
@@ -215,7 +133,7 @@ function MatchRequestCard({ dog, onAccept, onPlay, onView, activeDog }) {
             }}
             onClick={() => onPlay(dog.id)}
           >
-            <i className="bi bi-balloon-heart me-2" />Gioca!
+            <i className="bi bi-circle-fill me-2" />Gioca!
           </button>
 
           {/* Pulsante Match — solo se compatibile per accoppiamento */}

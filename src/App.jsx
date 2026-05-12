@@ -18,22 +18,15 @@ import Messaggi from "./pages/Messaggi";
 import RichiesteMatch from "./pages/RichiesteMatch";
 import SnoutBot from "./components/SnoutBot";
 import { dogService } from "./services/dogServices";
-<<<<<<< HEAD
 import { inviaLike, getRichiesteRicevute, rifiutaRichiesta } from "./services/interazioneServices";
-import { getSocket, disconnectSocket } from "./services/socketService";
+import { getSocket } from "./services/socketService";
 import { fetchNotifiche, segnaNotificaLetta, segnaAllNotificheLette } from "./services/notificaServices";
-=======
-import { inviaLike, inviaDislike, getRichiesteRicevute, rifiutaRichiesta } from "./services/interazioneServices";
->>>>>>> main
 
-// ── Estrae l'id dalla URL e lo passa a ViewProfiloUtente ──
 function ViewProfiloWrapper({ onBack }) {
   const { id } = useParams();
   return <ViewProfiloUtente utenteId={id} onBack={onBack} />;
 }
 
-// ── Layout condiviso per le pagine autenticate ──
-// Definito a livello di modulo per evitare rimount ad ogni render di App
 function AuthLayout({
   user, onLogout, notifications, richieste, notifiche,
   onNavigate, onNotificaClick, onMarkAllRead,
@@ -70,7 +63,6 @@ function AuthLayout({
       {showMatchAlert && <MatchAnimation />}
       <SnoutBot />
 
-      {/* Toast notifica in tempo reale */}
       {toastRichiesta.show && toastRichiesta.notifica && (() => {
         const n               = toastRichiesta.notifica;
         const isRichiesta     = n.tipo === 'richiesta_match' && n.payload;
@@ -154,7 +146,6 @@ function AuthLayout({
 }
 
 function App() {
-<<<<<<< HEAD
   const navigate  = useNavigate();
   const location  = useLocation();
 
@@ -174,31 +165,14 @@ function App() {
   const [richieste, setRichieste]           = useState([]);
   const [msgNotifiche, setMsgNotifiche]     = useState({});
   const [selectedMatchToOpen, setSelectedMatchToOpen] = useState(null);
+  const [onlineMap, setOnlineMap]           = useState({});
   const [notifiche, setNotifiche]           = useState([]);
   const [toastRichiesta, setToastRichiesta] = useState({ show: false, notifica: null });
 
   const pollingRef      = useRef(null);
   const chatApertaIdRef = useRef(null);
   const toastTimerRef   = useRef(null);
-=======
-  const [dogs, setDogs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [breed, setBreed] = useState("");
-  const [selectedDog, setSelectedDog] = useState(null);
-  const [showMatchAlert, setShowMatchAlert] = useState(false);
-  const [currentPage, setCurrentPage] = useState("landing");
-  const [user, setUser] = useState(null); // Parte come null
 
-  const [notifications, setNotifications] = useState({
-    messages: 0,
-    matches: 0,
-    richieste: 0,
-  });
-  const [richieste, setRichieste] = useState([]);
-  const pollingRef = useRef(null);
->>>>>>> main
-
-  // Geolocation
   useEffect(() => {
     if (!user || user.ruolo === 'admin') return;
     if (!navigator.geolocation) return;
@@ -218,7 +192,6 @@ function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.ruolo]);
 
-  // Controllo sessione — ripristina utente senza forzare navigazione
   useEffect(() => {
     const token     = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
@@ -229,7 +202,6 @@ function App() {
     setLoading(false);
   }, []);
 
-  // Badge messaggi e reset chat ref al cambio route
   useEffect(() => {
     if (location.pathname === '/messages') {
       setNotifications(prev => ({ ...prev, messages: 0 }));
@@ -257,44 +229,30 @@ function App() {
         .then(r => r.json())
         .then(data => {
           if (data.successo && data.matches) {
-<<<<<<< HEAD
             const formattati = data.matches.map(interazione => {
               const altroCane = interazione.mittenteCaneId === caneId
                 ? interazione.ricevente : interazione.mittente;
+              const mioCane = interazione.mittenteCaneId === caneId
+                ? interazione.mittente : interazione.ricevente;
               if (!altroCane) return null;
               const rawFile  = altroCane.fotoUrl ?? "";
               const nomeFile = rawFile.replace('uploads/', '').replace('/uploads/', '');
               return {
                 ...altroCane, interazioneId: interazione.id,
+                intento: interazione.intento,
                 name: altroCane.nome, nomeCaneDestinatario: altroCane.nome,
+                nomeMioCane: mioCane?.nome ?? null,
+                proprietarioId: altroCane.utenteId ? String(altroCane.utenteId) : null,
                 photo: nomeFile ? `/uploads/${nomeFile}` : "https://via.placeholder.com/400",
               };
             }).filter(Boolean);
-=======
-            const formattati = data.matches.map(dog => {
-              const rawFile = dog.fotoUrl ?? dog.foto_url ?? "";
-              const nomeFile = rawFile.replace('uploads/', '').replace('/uploads/', '');
-              return {
-                ...dog,
-                name: dog.nome,
-                photo: nomeFile ? `/uploads/${nomeFile}` : "https://via.placeholder.com/400",
-              };
-            });
->>>>>>> main
             dispatch({ type: "CARICA_MATCHES", payload: formattati });
           }
         }).catch(() => {});
     }
-<<<<<<< HEAD
     aggiornaSollecitiRichieste();
     pollingRef.current = setInterval(() => aggiornaSollecitiRichieste(), 30000);
     fetchNotifiche().then(d => { if (d.successo) setNotifiche(d.notifiche); }).catch(() => {});
-=======
-
-    // Polling richieste
-    aggiornaSollecitiRichieste(user);
-    pollingRef.current = setInterval(() => aggiornaSollecitiRichieste(user), 30000);
->>>>>>> main
     return () => clearInterval(pollingRef.current);
   }, [user, aggiornaSollecitiRichieste]);
 
@@ -320,8 +278,27 @@ function App() {
     navigate('/');
   };
 
-<<<<<<< HEAD
-  // Socket: messaggi
+  useEffect(() => {
+    if (!user) return;
+    const socket = getSocket();
+
+    socket.emit('get_online_users');
+
+    const handleList    = (ids) => setOnlineMap(Object.fromEntries(ids.map(id => [String(id), true])));
+    const handleOnline  = (id) => setOnlineMap(prev => ({ ...prev, [String(id)]: true }));
+    const handleOffline = (id) => setOnlineMap(prev => { const n = { ...prev }; delete n[String(id)]; return n; });
+
+    socket.on('online_users',  handleList);
+    socket.on('user_online',   handleOnline);
+    socket.on('user_offline',  handleOffline);
+
+    return () => {
+      socket.off('online_users',  handleList);
+      socket.off('user_online',   handleOnline);
+      socket.off('user_offline',  handleOffline);
+    };
+  }, [user]);
+
   useEffect(() => {
     if (!user) return;
     const socket  = getSocket();
@@ -334,7 +311,6 @@ function App() {
     return () => socket.off('nuova_notifica_messaggio', handler);
   }, [user]);
 
-  // Socket: notifiche unificate
   useEffect(() => {
     if (!user) return;
     const socket  = getSocket();
@@ -344,10 +320,10 @@ function App() {
         return [notifica, ...prev].slice(0, 50);
       });
       if (notifica.tipo === 'richiesta_match' && notifica.payload) {
-        const { interazioneId, intento, cane } = notifica.payload;
+        const { interazioneId, intento, cane, utente: utentePayload } = notifica.payload;
         setRichieste(prev => {
           if (prev.some(r => r.interazioneId === interazioneId)) return prev;
-          return [...prev, { interazioneId, intento, cane }];
+          return [...prev, { interazioneId, intento, cane, utente: utentePayload }];
         });
         setNotifications(prev => ({ ...prev, richieste: prev.richieste + 1 }));
       }
@@ -372,7 +348,6 @@ function App() {
     return () => { socket.off('nuova_notifica', handler); clearTimeout(toastTimerRef.current); };
   }, [user]);
 
-  // Socket: notifiche admin
   useEffect(() => {
     if (!user || user.ruolo !== 'admin') return;
     const socket  = getSocket();
@@ -405,10 +380,11 @@ function App() {
     setNotifications(prev => ({ ...prev, messages: Math.max(0, prev.messages - 1) }));
   };
 
-  const handleMarkNotificaRead     = async (id) => {
+  const handleMarkNotificaRead = async (id) => {
     setNotifiche(prev => prev.map(n => n.id === id ? { ...n, letto: true } : n));
     segnaNotificaLetta(id).catch(() => {});
   };
+
   const handleMarkAllNotificheRead = async () => {
     setNotifiche(prev => prev.map(n => ({ ...n, letto: true })));
     segnaAllNotificheLette().catch(() => {});
@@ -430,7 +406,6 @@ function App() {
     navigate('/messages');
   };
 
-  // Caricamento feed (solo sulla rotta /home)
   useEffect(() => {
     const caricaFeedReale = async () => {
       if (location.pathname !== '/home' || !user) return;
@@ -449,54 +424,21 @@ function App() {
         const response = useVicini
           ? await dogService.getVicini(mioCaneId, Number(filtroDistanza))
           : await dogService.getDiscovery(mioCaneId, { intento: filtroIntento, distanza: discoveryDistanza });
-=======
-  // 4. Caricamento Feed dal Database
-  useEffect(() => {
-    const caricaFeedReale = async () => {
-      // 1. Se non siamo in home o l'utente non c'è, fermati
-      if (currentPage !== "home" || !user) return;
-
-      setLoading(true);
-      try {
-
-        const caniUtente = user.iMieiCani || user.cani || [];
-        console.log("Dati utente attuale:", user);
-        const mioCaneId = caniUtente.length > 0 ? caniUtente[0].id : null;
-
-        if (!mioCaneId) {
-          console.log("Nessun cane trovato per questo utente");
-          setDogs([]);
-          setLoading(false);
-          return;
-        }
-
-        const response = await dogService.getDiscovery(mioCaneId);
-        // Assicuriamoci di prendere i dati corretti sia che usiamo fetch o axios
->>>>>>> main
         const data = response.data || response;
 
         if (data.successo && data.cani) {
           setDogs(data.cani.map(dog => {
             const rawFile  = dog.fotoUrl || dog.foto_url || "";
             const nomeFile = rawFile.replace('uploads/', '').replace('/uploads/', '');
-
             return {
-<<<<<<< HEAD
               ...dog, name: dog.nome,
               photo: nomeFile ? `/uploads/${nomeFile}` : "https://via.placeholder.com/400",
-=======
-              ...dog,
-              name: dog.nome,
-              photo: nomeFile
-                ? `/uploads/${nomeFile}`
-                : "https://via.placeholder.com/400",
->>>>>>> main
               breed: dog.razza,
               distance: dog.distanza_km != null ? parseFloat(dog.distanza_km) : null,
               lat: dog.proprietario?.latitudine ?? null, lng: dog.proprietario?.longitudine ?? null,
               proprietarioNome: dog.proprietario?.nome ?? null,
+              proprietarioId: dog.proprietario?.id ? String(dog.proprietario.id) : null,
             };
-<<<<<<< HEAD
           }));
         } else {
           setDogs([]); setFeedError(data.errore || "errore_generico");
@@ -508,60 +450,27 @@ function App() {
         }
         setDogs([]); setFeedError("errore_server");
       } finally { setLoading(false); }
-=======
-          });
-          setDogs(caniFormattati);
-        }
-      } catch (err) {
-        console.error("Errore caricamento feed:", err);
-      } finally {
-        setLoading(false);
-      }
->>>>>>> main
     };
     caricaFeedReale();
-<<<<<<< HEAD
   }, [location.pathname, user, filtroIntento, filtroDistanza, userLocation, selectedCaneIdx]);
-=======
-  }, [currentPage, user]);
->>>>>>> main
 
-  const initialState       = { requests: [], matches: [] };
-  const [state, dispatch]  = useReducer(dogReducer, initialState);
+  const initialState      = { requests: [], matches: [] };
+  const [state, dispatch] = useReducer(dogReducer, initialState);
 
   const sendLike = async (dogId, intento) => {
     const selectedDogData = dogs.find(d => d.id === dogId);
     if (!selectedDogData || !user) return;
-<<<<<<< HEAD
     const caniUtente = user.iMieiCani || user.cani || [];
     const mioCaneId  = (caniUtente[selectedCaneIdx] ?? caniUtente[0])?.id;
     if (!mioCaneId) { alert("Nessun cane associato al tuo account."); return; }
     try {
       const result = await inviaLike(mioCaneId, dogId, intento);
-=======
-
-    const mioCaneId = user.iMieiCani?.[0]?.id;
-    if (!mioCaneId) {
-      alert("Nessun cane associato al tuo account.");
-      return;
-    }
-
-    // Controllo compatibilità razza
-    const userBreed = user.iMieiCani?.[0]?.razza || "Meticcio";
-    if (selectedDogData.razza.toUpperCase() !== userBreed.toUpperCase()) {
-      alert(`RAZZA NON COMPATIBILE\n\nPuoi fare match solo con esemplari di razza ${userBreed}`);
-      return;
-    }
-
-    try {
-      const result = await inviaLike(mioCaneId, dogId);
-
->>>>>>> main
       if (!result.successo) return;
       setDogs(prev => prev.filter(d => d.id !== dogId));
       setSelectedDog(null);
       if (result.isMatch) {
-        dispatch({ type: "AGGIUNGI_MATCH_DIRETTO", payload: { ...selectedDogData, interazioneId: result.data?.id || null } });
+        const mioCane = (caniUtente[selectedCaneIdx] ?? caniUtente[0]);
+        dispatch({ type: "AGGIUNGI_MATCH_DIRETTO", payload: { ...selectedDogData, interazioneId: result.data?.id || null, intento, nomeMioCane: mioCane?.nome ?? null, proprietarioId: selectedDogData.proprietarioId ?? null } });
         triggerMatchAnimation();
         setTimeout(() => navigate('/messages'), 2000);
       }
@@ -593,6 +502,9 @@ function App() {
             ...richiesta.cane, name: richiesta.cane.nome,
             photo: nomeFile ? `/uploads/${nomeFile}` : "https://via.placeholder.com/400",
             interazioneId: result.data?.id || null,
+            intento: richiesta.intento,
+            nomeMioCane: user?.iMieiCani?.[0]?.nome ?? null,
+            proprietarioId: richiesta.utente?.id ? String(richiesta.utente.id) : null,
           },
         });
         triggerMatchAnimation();
@@ -614,23 +526,8 @@ function App() {
     localStorage.setItem("dogMatches", JSON.stringify(state.matches));
   }, [state.matches]);
 
-<<<<<<< HEAD
-  // Aspetta il controllo auth prima di renderizzare
   if (!authChecked) return null;
 
-  // Account bannato
-  if (user && (user.isBanned || user.isBloccato)) {
-    return <BannedPage user={user} onLogout={handleLogout} />;
-=======
-  // logica di blocco 
-  if (user && (user.status === 'banned' || user.isBanned)) {
-    return (
-      <BannedPage user={user} onLogout={handleLogout} />
-    )
->>>>>>> main
-  }
-
-  // Props condivise per AuthLayout
   const layoutProps = {
     user, onLogout: handleLogout,
     notifications, richieste, notifiche,
@@ -650,7 +547,7 @@ function App() {
 
   return (
     <Routes>
-      {/* ── Rotte pubbliche ── */}
+      {/* Rotte pubbliche */}
       <Route path="/"
         element={user
           ? <Navigate to="/home" replace />
@@ -667,8 +564,7 @@ function App() {
           : <Registrazione onSwitch={(page) => navigate('/' + page)} onRegisterSuccess={handleRegisterSuccess} />}
       />
 
-<<<<<<< HEAD
-      {/* ── Rotte protette ── */}
+      {/* Rotte protette */}
       <Route path="/home" element={
         !user ? <Navigate to="/" replace /> :
         <AuthLayout {...layoutProps}>
@@ -678,41 +574,6 @@ function App() {
                 dogs={dogs} loading={loading} feedError={feedError}
                 setSelectedDog={setSelectedDog}
                 handleAcceptMatch={handleAcceptMatch} handlePlayClick={handlePlayClick}
-=======
-      {currentPage === "register" && (
-        <Registrazione
-          onSwitch={setCurrentPage}
-          onRegisterSuccess={handleRegisterSuccess}
-        />
-      )}
-
-      {["home", "profile", "messages", "admin", "requests"].includes(currentPage) && user && (
-        <div className="d-flex flex-column min-vh-100" style={{ backgroundColor: "#f8fbfb" }}>
-          <Navbar
-            user={user}
-            onLogout={handleLogout}
-            notifications={notifications}
-            richieste={richieste}
-            onNavigate={(page) => setCurrentPage(page)}
-          />
-
-          <main className="container-fluid px-2 px-md-5 flex-grow-1 py-4">
-            {currentPage === "requests" && (
-              <RichiesteMatch
-                richieste={richieste}
-                onAccetta={handleAccettaRichiesta}
-                onRifiuta={handleRifiutaRichiesta}
-                onBack={() => setCurrentPage("home")}
-              />
-            )}
-
-            {currentPage === "admin" && user?.isAdmin && (
-              <AdminPanel onBack={() => setCurrentPage("home")} />
-            )}
-
-            {currentPage === "profile" && (
-              <UserProfilo
->>>>>>> main
                 user={user}
                 filtroIntento={filtroIntento} setFiltroIntento={setFiltroIntento}
                 filtroDistanza={filtroDistanza} setFiltroDistanza={setFiltroDistanza}
@@ -720,8 +581,8 @@ function App() {
                 hasLocation={!!userLocation}
                 selectedCaneIdx={selectedCaneIdx}
                 onSwitchCane={(idx) => { setSelectedCaneIdx(idx); setDogs([]); }}
+                onlineMap={onlineMap}
               />
-<<<<<<< HEAD
             </div>
             <div className="col-xl-3 col-lg-4">
               <div className="sticky-top" style={{ top: "90px" }}>
@@ -735,7 +596,7 @@ function App() {
                     <div style={{ maxHeight: "70vh", overflowY: "auto" }}>
                       {state.matches.length === 0
                         ? <p className="text-muted mb-0 small text-center py-4">Ancora nessun match</p>
-                        : <MatchList matches={state.matches} msgNotifiche={msgNotifiche} onSelectMatch={apriChat} />
+                        : <MatchList matches={state.matches} msgNotifiche={msgNotifiche} onSelectMatch={apriChat} onlineMap={onlineMap} />
                       }
                     </div>
                   </div>
@@ -756,6 +617,7 @@ function App() {
             clearMsgNotifica={clearMsgNotifica}
             initialMatch={selectedMatchToOpen}
             onChatChange={(id) => { chatApertaIdRef.current = id; }}
+            onlineMap={onlineMap}
           />
         </AuthLayout>
       } />
@@ -800,66 +662,8 @@ function App() {
         </AuthLayout>
       } />
 
-      {/* Fallback */}
       <Route path="*" element={<Navigate to={user ? "/home" : "/"} replace />} />
     </Routes>
-=======
-            )}
-
-            {currentPage === "home" && (
-              <div className="row g-3 g-lg-4">
-                <div className="col-xl-9 col-lg-8">
-                  <Home
-                    dogs={breed ? dogs.filter(d => d.razza?.toLowerCase().includes(breed.toLowerCase())) : dogs}
-                    loading={loading}
-                    breed={breed}
-                    setBreed={setBreed}
-                    setSelectedDog={setSelectedDog}
-                    handleAcceptMatch={handleAcceptMatch}
-                    handleRejectDog={handleRejectDog}
-                    user={user}
-                  />
-                </div>
-
-                <div className="col-xl-3 col-lg-4">
-                  <div className="sticky-top" style={{ top: "90px" }}>
-                    <div className="bg-white rounded-4 shadow-sm p-3 border-0">
-                      <h6 className="fw-bold mb-3 border-bottom pb-2 text-secondary">
-                        Match ({state.matches.length})
-                      </h6>
-                      <div style={{ maxHeight: "70vh", overflowY: "auto" }}>
-                        {state.matches.length === 0 ? (
-                          <p className="text-muted mb-0 small text-center py-4">Ancora nessun match</p>
-                        ) : (
-                          <MatchList matches={state.matches} />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {currentPage === "messages" && (
-              <Messaggi matches={state.matches} onBack={() => setCurrentPage('home')} />
-            )}
-          </main>
-
-          <Footer />
-
-          {selectedDog && (
-            <InfoCane
-              dog={selectedDog}
-              onClose={() => setSelectedDog(null)}
-              onAccept={handleAcceptMatch}
-            />
-          )}
-          {showMatchAlert && <MatchAnimation />}
-          <SnoutBot />
-        </div>
-      )}
-    </>
->>>>>>> main
   );
 }
 

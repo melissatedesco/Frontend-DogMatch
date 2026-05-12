@@ -59,7 +59,7 @@ const AdminHome = ({ onNavigate }) => {
       }
     };
     fetchAll();
-  }, );
+  }, []);
 
   const eliminaCane = async (id) => {
     if (!window.confirm("Eliminare questo cane? L'azione non è reversibile.")) return;
