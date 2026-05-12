@@ -9,14 +9,9 @@ const getAuthHeader = () => {
 
 export const dogService = {
     // GET Discovery Feed (quello che usi per la Home)
-    getDiscovery: async (caneId, { intento, distanza } = {}) => {
+    getDiscovery: async (caneId) => {
         try {
-            const params = new URLSearchParams();
-            if (intento)  params.append('intento',  intento);
-            if (distanza) params.append('distanza', distanza);
-            const qs = params.toString() ? `?${params.toString()}` : '';
-
-            const response = await fetch(`${API_URL}/discovery/${caneId}${qs}`, {
+            const response = await fetch(`${API_URL}/discovery/${caneId}`, {
                 method: 'GET',
                 headers: getAuthHeader()
             });

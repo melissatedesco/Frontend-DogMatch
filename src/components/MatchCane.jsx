@@ -109,21 +109,9 @@ function MatchRequestCard({ dog, onAccept, onReject, onView }) {
 
 
 
-              <div className="text-muted small mb-2">
-                {dog.eta != null ? `${dog.eta} ${dog.eta === 1 ? 'anno' : 'anni'}` : ''}
-                {dog.sesso ? ` · ${dog.sesso === 'M' ? 'Maschio' : 'Femmina'}` : ''}
-              </div>
+              <div className="text-muted small mb-3"> 2 anni </div>
 
-              {/* Bio del cane */}
-              {dog.descrizione && (
-                <div className="mb-3">
-                  <p className="small fw-semibold mb-1" style={{ color: "#7FBCC8" }}>Bio del cane</p>
-                  <p className="text-muted small mb-0"
-                    style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                    {dog.descrizione}
-                  </p>
-                </div>
-              )}
+
 
                 {/* tag piccoli grigi */}
 
