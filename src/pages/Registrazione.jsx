@@ -9,8 +9,6 @@ const Registrazione = ({ onSwitch, onRegisterSuccess }) => {
     password: "",
     telefono: "",
     citta: "",
-    provincia: "",
-    regione: "",
     caneNome: "",
     caneRazza: "",
     caneEta: "",
@@ -56,14 +54,12 @@ const Registrazione = ({ onSwitch, onRegisterSuccess }) => {
 
     const dataToSend = new FormData();
     Object.keys(formData).forEach(key => {
-      if (key === "citta" || key === "provincia" || key === "regione") return; // gestiti separatamente
+      if (key === "citta") return; // gestito separatamente come posizione
       let value = formData[key];
       if (key === "caneEta" || key === "canePeso") value = Number(value);
       if (value !== null && value !== undefined) dataToSend.append(key, value);
     });
     dataToSend.append("posizione", JSON.stringify({ citta: formData.citta || "Non specificata" }));
-    if (formData.provincia) dataToSend.append("provincia", formData.provincia);
-    if (formData.regione)   dataToSend.append("regione",   formData.regione);
 
     try {
       const response = await fetch("/api/auth/register", {
@@ -290,20 +286,9 @@ const Registrazione = ({ onSwitch, onRegisterSuccess }) => {
                 <input name="telefono" type="text" className="form-control" style={inputStyle} value={formData.telefono} onChange={handleChange} required />
               </div>
 
-              <div className="mb-3">
+              <div className="mb-4">
                 <label style={labelStyle}>CITTÀ</label>
-                <input name="citta" type="text" className="form-control" style={inputStyle} value={formData.citta} onChange={handleChange} placeholder="es. Roma" />
-              </div>
-
-              <div className="row">
-                <div className="col-md-6 mb-4">
-                  <label style={labelStyle}>PROVINCIA <span style={{ color: "#EFA6BA" }}>*</span></label>
-                  <input name="provincia" type="text" className="form-control" style={inputStyle} value={formData.provincia} onChange={handleChange} placeholder="es. RM" required />
-                </div>
-                <div className="col-md-6 mb-4">
-                  <label style={labelStyle}>REGIONE <span style={{ color: "#EFA6BA" }}>*</span></label>
-                  <input name="regione" type="text" className="form-control" style={inputStyle} value={formData.regione} onChange={handleChange} placeholder="es. Lazio" required />
-                </div>
+                <input name="citta" type="text" className="form-control" style={inputStyle} value={formData.citta} onChange={handleChange} placeholder="es. Roma" required />
               </div>
 
               <button

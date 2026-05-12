@@ -4,6 +4,7 @@ import MatchRequestCard from "../components/MatchCane";
 import BarraRicercaRazza from "../components/BarraRicercaRazza";
 import MappaRicerca from "../components/MappaRicerca";
 
+<<<<<<< HEAD
 const INTENTI = [
     { value: "",              label: "Tutti" },
     { value: "gioco",         label: "Gioco" },
@@ -122,9 +123,14 @@ const Home = ({ dogs, loading, feedError, setSelectedDog, handleAcceptMatch, han
         return <NoCanePrompt onNavigate={onNavigate} />;
     }
 
+=======
+const Home = ({dogs, loading, breed, setBreed, setSelectedDog, handleAcceptMatch, handleRejectDog, user}) => {
+    
+>>>>>>> main
     return (
         <div className="container-fluid p-0">
 
+<<<<<<< HEAD
             {/* Selettore cane attivo (solo se l'utente ha più cani) */}
             {caniUtente.length > 1 && (
                 <div className="bg-white rounded-4 shadow-sm p-3 mb-3 d-flex align-items-center gap-3 flex-wrap"
@@ -217,6 +223,10 @@ const Home = ({ dogs, loading, feedError, setSelectedDog, handleAcceptMatch, han
                 </div>
             </div>
 
+=======
+            <h4 className="fw-bold mb-4">Consigliati per te</h4>
+            
+>>>>>>> main
             {loading ? (
                 <div className="text-center py-5">
                     <div className="spinner-border" style={{ color: "#EFA6BA" }} />
@@ -229,7 +239,19 @@ const Home = ({ dogs, loading, feedError, setSelectedDog, handleAcceptMatch, han
                     onPlay={handlePlayClick}
                 />
             ) : dogs.length === 0 ? (
+<<<<<<< HEAD
                 <EmptyFeed feedError={feedError} caneRazza={caneRazza} filtroIntento={filtroIntento} />
+=======
+                <div className="text-center py-5 text-muted">
+                    <i className="bi bi-search d-block mb-3" style={{ fontSize: "3rem", opacity: 0.3 }} />
+                    <p className="fw-semibold mb-1">Nessun cane trovato</p>
+                    <p className="small">
+                        {breed
+                            ? <>Nessun risultato per <strong>{breed}</strong>. Prova a cambiare razza o <button className="btn btn-link btn-sm p-0" onClick={() => setBreed("")}>mostra tutti</button>.</>
+                            : "Hai già visto tutti i cani disponibili. Torna più tardi!"}
+                    </p>
+                </div>
+>>>>>>> main
             ) : (
                 <div className="row g-4">
                     {dogs

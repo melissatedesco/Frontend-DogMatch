@@ -83,11 +83,103 @@ function MatchRequestCard({ dog, onAccept, onPlay, onView, activeDog }) {
           <div className="text-muted small">{dog.breed}</div>
         </div>
 
+<<<<<<< HEAD
         <div className="text-muted small">
           {dog.eta != null ? `${dog.eta} ${dog.eta === 1 ? "anno" : "anni"}` : ""}
           {dog.sesso ? ` · ${dog.sesso === "M" ? "Maschio" : "Femmina"}` : ""}
           {dog.taglia ? ` · Taglia ${dog.taglia}` : ""}
         </div>
+=======
+              <div>
+
+                <h6 className="fw-bold mb-0"
+
+                style={{
+
+                  fontSize: '1.1rem'
+
+                }}>{dog.name}</h6>
+
+                <div className="text-muted small">
+
+                  {dog.breed}
+
+                </div>
+
+              </div>
+
+              <div className="text-muted small">
+
+                <i className="bi bi-geo-alt-fill text-bg-danger me-1"></i>
+
+                {dog.distance}
+
+              </div>
+
+               </div>
+
+
+
+              <div className="text-muted small mb-3"> 2 anni </div>
+
+
+
+                {/* tag piccoli grigi */}
+
+                <div className="d-flex gap-1 mb-3">
+
+                  <span className="badge bg-light text-muted border rounded-pill px-2 py-1"
+
+                  style={{
+
+                    fontSize: '0.6rem',
+
+                    fontWeight: '500'
+
+                  }}>
+
+                    <i className="bi bi-check-fill text-success me-1"></i>
+
+                    Pedigree
+
+                  </span>
+
+
+
+                  <span className="badge bg-light text-muted border rounded-pill px-2 py-1"
+
+                   style={{
+
+                    fontSize: '0.6rem',
+
+                    fontWeight: '500'
+
+                  }}>
+
+                    <i className="bi bi-check-fill text-success me-1"></i>
+
+                    Genetica
+
+                  </span>
+
+                </div>
+
+             
+
+              {/* pulsanti azione */}
+
+               <div className="d-flex gap-2">
+
+
+
+                 
+
+          <button
+
+            className="btn btn-outline-light text-dark border flex-grow-1 rounded-pill btn-sm fw-bold"
+
+            onClick={() => onReject(dog.id)}
+>>>>>>> main
 
         {dog.descrizione && (
           <p
