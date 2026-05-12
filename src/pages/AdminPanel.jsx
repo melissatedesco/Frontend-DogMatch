@@ -43,7 +43,7 @@ const AdminPanel = ({ onBack }) => {
   useEffect(() => {
     fetchUtenti();
     fetchCani();
-  }, []);
+  }, );
 
   const toggleVerifica = async (id, current) => {
     setSavingId(id);
@@ -57,7 +57,7 @@ const AdminPanel = ({ onBack }) => {
     } catch { /* silent */ } finally { setSavingId(null); }
   };
 
-  const toggleBlocco = async (id, currentBloccato) => {
+  const toggleBlocco = async (id) => {
     setBlockingId(id);
     try {
       const res  = await fetch(`/api/admin/utenti/${id}/blocco`, { method: "PUT", headers: { Authorization: `Bearer ${token}` } });

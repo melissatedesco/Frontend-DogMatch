@@ -1,4 +1,5 @@
 import { useEffect, useState, useReducer, useRef, useCallback } from "react";
+import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from "react-router-dom";
 import dogReducer from "./store/reducers/dogReducer";
 import MatchList from "./components/ListaRichieste";
 import AdminMatchSidebar from "./components/AdminMatchSidebar";
@@ -22,40 +23,164 @@ import { inviaLike, getRichiesteRicevute, rifiutaRichiesta } from "./services/in
 import { getSocket, disconnectSocket } from "./services/socketService";
 import { fetchNotifiche, segnaNotificaLetta, segnaAllNotificheLette } from "./services/notificaServices";
 
+// ── Estrae l'id dalla URL e lo passa a ViewProfiloUtente ──
+function ViewProfiloWrapper({ onBack }) {
+  const { id } = useParams();
+  return <ViewProfiloUtente utenteId={id} onBack={onBack} />;
+}
+
+// ── Layout condiviso per le pagine autenticate ──
+// Definito a livello di modulo per evitare rimount ad ogni render di App
+function AuthLayout({
+  user, onLogout, notifications, richieste, notifiche,
+  onNavigate, onNotificaClick, onMarkAllRead,
+  onAccettaRichiesta, onRifiutaRichiesta, onViewProfilo,
+  selectedDog, onCloseDog, onAcceptDog,
+  showMatchAlert, toastRichiesta, onDismissToast,
+  children,
+}) {
+  return (
+    <div className="d-flex flex-column min-vh-100" style={{ backgroundColor: "#f8fbfb" }}>
+      <Navbar
+        user={user}
+        onLogout={onLogout}
+        notifications={notifications}
+        richieste={richieste}
+        onNavigate={onNavigate}
+        notifiche={notifiche}
+        onNotificaClick={onNotificaClick}
+        onMarkAllRead={onMarkAllRead}
+        onAccettaRichiesta={onAccettaRichiesta}
+        onRifiutaRichiesta={onRifiutaRichiesta}
+        onViewProfilo={onViewProfilo}
+      />
+
+      <main className="container-fluid px-2 px-md-5 flex-grow-1 py-4">
+        {children}
+      </main>
+
+      <Footer />
+
+      {selectedDog && (
+        <InfoCane dog={selectedDog} onClose={onCloseDog} onAccept={onAcceptDog} />
+      )}
+      {showMatchAlert && <MatchAnimation />}
+      <SnoutBot />
+
+      {/* Toast notifica in tempo reale */}
+      {toastRichiesta.show && toastRichiesta.notifica && (() => {
+        const n               = toastRichiesta.notifica;
+        const isRichiesta     = n.tipo === 'richiesta_match' && n.payload;
+        const payload         = n.payload;
+        const pendingRichiesta = isRichiesta
+          ? richieste.find(r => r.interazioneId === payload.interazioneId)
+          : null;
+        const caneImg = (pendingRichiesta?.cane?.fotoUrl ?? payload?.cane?.fotoUrl)
+          ? (() => {
+              const raw = pendingRichiesta?.cane?.fotoUrl ?? payload?.cane?.fotoUrl;
+              if (raw.startsWith('http')) return raw;
+              return `/uploads/${raw.replace('uploads/', '').replace('/uploads/', '')}`;
+            })()
+          : null;
+        const caneName    = pendingRichiesta?.cane?.nome ?? payload?.cane?.nome;
+        const intentoText = (pendingRichiesta?.intento ?? payload?.intento) === 'accoppiamento'
+          ? 'un Match' : 'giocare insieme';
+
+        return (
+          <div className="position-fixed bottom-0 end-0 p-3" style={{ zIndex: 9999 }}>
+            <div className="shadow-lg" style={{
+              backgroundColor: 'white', borderRadius: '18px', width: '320px',
+              border: '1.5px solid #f0e0e8', overflow: 'hidden',
+              animation: 'slideInUp 0.25s ease-out',
+            }}>
+              <div className="d-flex align-items-center justify-content-between px-3 py-2"
+                style={{ background: isRichiesta ? 'linear-gradient(90deg, #EFA6BA, #7FBCC8)' : '#7FBCC8' }}>
+                <div className="d-flex align-items-center gap-2 text-white">
+                  <i className="bi bi-bell-fill" style={{ fontSize: '0.85rem' }} />
+                  <span className="fw-bold" style={{ fontSize: '0.82rem' }}>
+                    {isRichiesta ? 'Nuova richiesta' : 'Notifica'}
+                  </span>
+                </div>
+                <button className="btn-close btn-close-white" style={{ fontSize: '0.6rem' }} onClick={onDismissToast} />
+              </div>
+
+              <div className="px-3 py-3">
+                {isRichiesta ? (
+                  <>
+                    <div className="d-flex align-items-center gap-2 mb-3">
+                      {caneImg ? (
+                        <img src={caneImg} alt={caneName}
+                          onError={e => { e.target.src = 'https://cdn-icons-png.flaticon.com/512/616/616408.png'; }}
+                          style={{ width: '52px', height: '52px', borderRadius: '50%', objectFit: 'cover', border: '2.5px solid #EFA6BA', flexShrink: 0 }} />
+                      ) : (
+                        <div style={{ width: '52px', height: '52px', borderRadius: '50%', backgroundColor: '#fef6f8', border: '2px solid #EFA6BA', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <i className="bi bi-heart-fill" style={{ color: '#EFA6BA', fontSize: '1.4rem' }} />
+                        </div>
+                      )}
+                      <div>
+                        {caneName && <div className="fw-bold" style={{ fontSize: '0.9rem', color: '#1c1e21' }}>{caneName}</div>}
+                        <div style={{ fontSize: '0.78rem', color: '#777' }}>vorrebbe {intentoText} con il tuo cane!</div>
+                      </div>
+                    </div>
+                    <div className="d-flex gap-2">
+                      <button className="btn btn-sm rounded-pill fw-bold text-white flex-grow-1"
+                        style={{ backgroundColor: '#28a745', border: 'none', fontSize: '0.82rem' }}
+                        onClick={() => { if (pendingRichiesta) onAccettaRichiesta(pendingRichiesta); onDismissToast(); }}>
+                        <i className="bi bi-check-lg me-1" />Accetta
+                      </button>
+                      <button className="btn btn-sm rounded-pill fw-bold flex-grow-1"
+                        style={{ backgroundColor: '#fff3f3', color: '#dc3545', border: '1.5px solid #f5c6cb', fontSize: '0.82rem' }}
+                        onClick={() => { if (pendingRichiesta) onRifiutaRichiesta(pendingRichiesta); onDismissToast(); }}>
+                        <i className="bi bi-x-lg me-1" />Rifiuta
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="d-flex align-items-center gap-2">
+                    <i className="bi bi-bell text-muted" style={{ fontSize: '1.1rem' }} />
+                    <div style={{ fontSize: '0.82rem', color: '#555' }}>{n.messaggio}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
 
 function App() {
-  const [dogs, setDogs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [feedError, setFeedError] = useState(null);
+  const navigate  = useNavigate();
+  const location  = useLocation();
+
+  const [dogs, setDogs]               = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [feedError, setFeedError]     = useState(null);
   const [selectedDog, setSelectedDog] = useState(null);
-  const [filtroIntento, setFiltroIntento] = useState("");
-  const [filtroDistanza, setFiltroDistanza] = useState("");
-  const [userLocation, setUserLocation] = useState(null);
+  const [filtroIntento, setFiltroIntento]     = useState("");
+  const [filtroDistanza, setFiltroDistanza]   = useState("");
+  const [userLocation, setUserLocation]       = useState(null);
   const [selectedCaneIdx, setSelectedCaneIdx] = useState(0);
-  const [viewProfileId, setViewProfileId] = useState(null);
-  const [showMatchAlert, setShowMatchAlert] = useState(false);
-  const [currentPage, setCurrentPage] = useState("landing");
-  const [user, setUser] = useState(null); // Parte come null
+  const [showMatchAlert, setShowMatchAlert]   = useState(false);
+  const [user, setUser]               = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
 
-  const [notifications, setNotifications] = useState({
-    messages: 0,
-    matches: 0,
-    richieste: 0,
-  });
-  const [richieste, setRichieste] = useState([]);
-  const [msgNotifiche, setMsgNotifiche] = useState({});
+  const [notifications, setNotifications]   = useState({ messages: 0, matches: 0, richieste: 0 });
+  const [richieste, setRichieste]           = useState([]);
+  const [msgNotifiche, setMsgNotifiche]     = useState({});
   const [selectedMatchToOpen, setSelectedMatchToOpen] = useState(null);
-  const [notifiche, setNotifiche] = useState([]);
+  const [notifiche, setNotifiche]           = useState([]);
   const [toastRichiesta, setToastRichiesta] = useState({ show: false, notifica: null });
-  const pollingRef = useRef(null);
-  const chatApertaIdRef = useRef(null);
-  const toastTimerRef = useRef(null);
 
-  // Geolocation: richiesta una sola volta per sessione
+  const pollingRef      = useRef(null);
+  const chatApertaIdRef = useRef(null);
+  const toastTimerRef   = useRef(null);
+
+  // Geolocation
   useEffect(() => {
     if (!user || user.ruolo === 'admin') return;
     if (!navigator.geolocation) return;
-
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
@@ -64,32 +189,34 @@ function App() {
         fetch('/api/utenti/posizione', {
           method: 'PUT',
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ latitudine: coords.lat, longitudine: coords.lon })
+          body: JSON.stringify({ latitudine: coords.lat, longitudine: coords.lon }),
         }).catch(() => {});
       },
-      () => { /* permesso negato */ }
+      () => {}
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.ruolo]);
 
-  // 1. Controllo sessione all'avvio
+  // Controllo sessione — ripristina utente senza forzare navigazione
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token     = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
-
     if (token && savedUser) {
-      try {
-        const userData = JSON.parse(savedUser);
-        setUser(userData);
-        setCurrentPage("home");
-      } catch (e) {
-        localStorage.clear();
-      }
+      try { setUser(JSON.parse(savedUser)); } catch { localStorage.clear(); }
     }
+    setAuthChecked(true);
     setLoading(false);
   }, []);
 
-  // Polling richieste ricevute
+  // Badge messaggi e reset chat ref al cambio route
+  useEffect(() => {
+    if (location.pathname === '/messages') {
+      setNotifications(prev => ({ ...prev, messages: 0 }));
+    } else {
+      chatApertaIdRef.current = null;
+    }
+  }, [location.pathname]);
+
   const aggiornaSollecitiRichieste = useCallback(async () => {
     try {
       const data = await getRichiesteRicevute();
@@ -102,82 +229,62 @@ function App() {
 
   useEffect(() => {
     if (!user) return;
-
     const caneId = user.iMieiCani?.[0]?.id;
-
-    // Carica matches dal backend
     if (caneId) {
       const token = localStorage.getItem('token');
-      fetch(`/api/interazioni/matches/${caneId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      fetch(`/api/interazioni/matches/${caneId}`, { headers: { Authorization: `Bearer ${token}` } })
         .then(r => r.json())
         .then(data => {
           if (data.successo && data.matches) {
-            const formattati = data.matches
-              .map(interazione => {
-                // interazione ha mittente e ricevente — prendiamo il cane dell'altro
-                const altroCane = interazione.mittenteCaneId === caneId
-                  ? interazione.ricevente
-                  : interazione.mittente;
-                if (!altroCane) return null;
-                const rawFile = altroCane.fotoUrl ?? "";
-                const nomeFile = rawFile.replace('uploads/', '').replace('/uploads/', '');
-                return {
-                  ...altroCane,
-                  interazioneId: interazione.id,
-                  name: altroCane.nome,
-                  nomeCaneDestinatario: altroCane.nome,
-                  photo: nomeFile ? `/uploads/${nomeFile}` : "https://via.placeholder.com/400",
-                };
-              })
-              .filter(Boolean);
+            const formattati = data.matches.map(interazione => {
+              const altroCane = interazione.mittenteCaneId === caneId
+                ? interazione.ricevente : interazione.mittente;
+              if (!altroCane) return null;
+              const rawFile  = altroCane.fotoUrl ?? "";
+              const nomeFile = rawFile.replace('uploads/', '').replace('/uploads/', '');
+              return {
+                ...altroCane, interazioneId: interazione.id,
+                name: altroCane.nome, nomeCaneDestinatario: altroCane.nome,
+                photo: nomeFile ? `/uploads/${nomeFile}` : "https://via.placeholder.com/400",
+              };
+            }).filter(Boolean);
             dispatch({ type: "CARICA_MATCHES", payload: formattati });
           }
-        })
-        .catch(() => { });
+        }).catch(() => {});
     }
-
-    // Polling richieste
     aggiornaSollecitiRichieste();
     pollingRef.current = setInterval(() => aggiornaSollecitiRichieste(), 30000);
-
-    // Carica notifiche storiche (copre notifiche ricevute offline)
     fetchNotifiche().then(d => { if (d.successo) setNotifiche(d.notifiche); }).catch(() => {});
-
     return () => clearInterval(pollingRef.current);
-  }, [user]);
+  }, [user, aggiornaSollecitiRichieste]);
 
-  // Registrazione
   const handleRegisterSuccess = (userData) => {
     localStorage.removeItem('dogMatches');
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
-    setCurrentPage("home");
+    navigate('/home');
   };
 
-  // 2. Gestione Login
   const handleLoginSuccess = (userData) => {
     localStorage.removeItem('dogMatches');
     setUser(userData);
     localStorage.setItem('user', JSON.stringify(userData));
-    setCurrentPage("home");
+    navigate('/home');
   };
 
-  // 3. Gestione Logout
   const handleLogout = () => {
     disconnectSocket();
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('dogMatches');
     setUser(null);
-    setCurrentPage('landing');
+    navigate('/');
   };
 
-  // Socket: notifiche messaggi in tempo reale — skip se l'utente è già in quella chat
+  // Socket: messaggi
   useEffect(() => {
     if (!user) return;
-    const socket = getSocket();
+    const socket  = getSocket();
     const handler = ({ interazioneId }) => {
       if (String(interazioneId) === String(chatApertaIdRef.current)) return;
       setMsgNotifiche(prev => ({ ...prev, [interazioneId]: (prev[interazioneId] || 0) + 1 }));
@@ -187,19 +294,15 @@ function App() {
     return () => socket.off('nuova_notifica_messaggio', handler);
   }, [user]);
 
-  // Socket: notifiche unificate (richiesta_match, match_accettato, messaggio)
+  // Socket: notifiche unificate
   useEffect(() => {
     if (!user) return;
-    const socket = getSocket();
+    const socket  = getSocket();
     const handler = (notifica) => {
-      console.log('[Socket] nuova_notifica ricevuta:', notifica.tipo, notifica.messaggio);
-      // Aggiunge alla lista storica (campanella)
       setNotifiche(prev => {
         if (prev.some(n => n.id === notifica.id)) return prev;
         return [notifica, ...prev].slice(0, 50);
       });
-
-      // Aggiorna lista richieste se è una richiesta_match
       if (notifica.tipo === 'richiesta_match' && notifica.payload) {
         const { interazioneId, intento, cane } = notifica.payload;
         setRichieste(prev => {
@@ -208,51 +311,38 @@ function App() {
         });
         setNotifications(prev => ({ ...prev, richieste: prev.richieste + 1 }));
       }
-
-      // Suono ping via Web Audio API
       try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         [[880, 0, 0.18], [1100, 0.12, 0.18]].forEach(([freq, delay, dur]) => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.connect(gain);
-          gain.connect(ctx.destination);
-          osc.type = 'sine';
-          osc.frequency.value = freq;
+          const osc = ctx.createOscillator(), gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.type = 'sine'; osc.frequency.value = freq;
           gain.gain.setValueAtTime(0.22, ctx.currentTime + delay);
           gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + dur);
-          osc.start(ctx.currentTime + delay);
-          osc.stop(ctx.currentTime + delay + dur);
+          osc.start(ctx.currentTime + delay); osc.stop(ctx.currentTime + delay + dur);
         });
       } catch { /* audio non supportato */ }
-
-      // Toast auto-sparisce dopo 5 secondi
       setToastRichiesta({ show: true, notifica });
       clearTimeout(toastTimerRef.current);
       toastTimerRef.current = setTimeout(
-        () => setToastRichiesta({ show: false, notifica: null }),
-        5000
+        () => setToastRichiesta({ show: false, notifica: null }), 5000
       );
     };
     socket.on('nuova_notifica', handler);
-    return () => {
-      socket.off('nuova_notifica', handler);
-      clearTimeout(toastTimerRef.current);
-    };
+    return () => { socket.off('nuova_notifica', handler); clearTimeout(toastTimerRef.current); };
   }, [user]);
 
-  // Socket: notifiche di sistema solo per admin (nuovo utente, nuovo cane, ecc.)
+  // Socket: notifiche admin
   useEffect(() => {
     if (!user || user.ruolo !== 'admin') return;
-    const socket = getSocket();
+    const socket  = getSocket();
     const handler = (notifica) => {
       const entry = { id: `sys_${Date.now()}`, letto: false, ...notifica };
       setNotifiche(prev => [entry, ...prev].slice(0, 50));
       try {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         [[660, 0, 0.15], [880, 0.1, 0.15]].forEach(([freq, delay, dur]) => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
+          const osc = ctx.createOscillator(), gain = ctx.createGain();
           osc.connect(gain); gain.connect(ctx.destination);
           osc.type = 'sine'; osc.frequency.value = freq;
           gain.gain.setValueAtTime(0.18, ctx.currentTime + delay);
@@ -262,26 +352,23 @@ function App() {
       } catch { /* audio non supportato */ }
       setToastRichiesta({ show: true, notifica: entry });
       clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = setTimeout(() => setToastRichiesta({ show: false, notifica: null }), 5000);
+      toastTimerRef.current = setTimeout(
+        () => setToastRichiesta({ show: false, notifica: null }), 5000
+      );
     };
     socket.on('notifica_admin', handler);
     return () => { socket.off('notifica_admin', handler); };
   }, [user]);
 
   const clearMsgNotifica = (interazioneId) => {
-    setMsgNotifiche(prev => {
-      const next = { ...prev };
-      delete next[interazioneId];
-      return next;
-    });
+    setMsgNotifiche(prev => { const next = { ...prev }; delete next[interazioneId]; return next; });
     setNotifications(prev => ({ ...prev, messages: Math.max(0, prev.messages - 1) }));
   };
 
-  const handleMarkNotificaRead = async (id) => {
+  const handleMarkNotificaRead     = async (id) => {
     setNotifiche(prev => prev.map(n => n.id === id ? { ...n, letto: true } : n));
     segnaNotificaLetta(id).catch(() => {});
   };
-
   const handleMarkAllNotificheRead = async () => {
     setNotifiche(prev => prev.map(n => ({ ...n, letto: true })));
     segnaAllNotificheLette().catch(() => {});
@@ -290,53 +377,33 @@ function App() {
   const handleNotificaClick = (notifica) => {
     handleMarkNotificaRead(notifica.id);
     if (notifica.link === 'requests') {
-      setCurrentPage('requests');
+      navigate('/requests');
     } else if (notifica.link?.startsWith('chat:')) {
       const interazioneId = notifica.link.split(':')[1];
       const match = state.matches.find(m => String(m.interazioneId) === String(interazioneId));
-      if (match) apriChat(match);
-      else setCurrentPage('messages');
+      if (match) apriChat(match); else navigate('/messages');
     }
   };
 
-  // Apri una specifica chat navigando verso messages
   const apriChat = (match) => {
     setSelectedMatchToOpen(match);
-    setCurrentPage("messages");
+    navigate('/messages');
   };
 
-  // Azzera il badge messaggi quando si entra nella pagina messages; pulisce la chat aperta quando si esce
-  useEffect(() => {
-    if (currentPage === "messages") {
-      setNotifications(prev => ({ ...prev, messages: 0 }));
-    } else {
-      chatApertaIdRef.current = null;
-    }
-  }, [currentPage]);
-
-  // 4. Caricamento Feed dal Database
+  // Caricamento feed (solo sulla rotta /home)
   useEffect(() => {
     const caricaFeedReale = async () => {
-      if (currentPage !== "home" || !user) return;
-
-      setLoading(true);
-      setFeedError(null);
+      if (location.pathname !== '/home' || !user) return;
+      setLoading(true); setFeedError(null);
       try {
-        const caniUtente = user.iMieiCani || user.cani || [];
-        const activeCane = caniUtente[selectedCaneIdx] ?? caniUtente[0];
-        const mioCaneId = activeCane?.id ?? null;
+        const caniUtente    = user.iMieiCani || user.cani || [];
+        const activeCane    = caniUtente[selectedCaneIdx] ?? caniUtente[0];
+        const mioCaneId     = activeCane?.id ?? null;
+        if (!mioCaneId) { setDogs([]); setFeedError("nessun_cane"); setLoading(false); return; }
 
-        if (!mioCaneId) {
-          setDogs([]);
-          setFeedError("nessun_cane");
-          setLoading(false);
-          return;
-        }
-
-        const KM_FILTERS = ["5", "10", "50"];
-        const isKmFilter = KM_FILTERS.includes(filtroDistanza);
-        const useVicini = isKmFilter && userLocation;
-        // Quando km filter selezionato ma nessuna posizione → discovery senza filtro geo
+        const KM_FILTERS        = ["5", "10", "50"];
+        const isKmFilter        = KM_FILTERS.includes(filtroDistanza);
+        const useVicini         = isKmFilter && userLocation;
         const discoveryDistanza = isKmFilter ? "" : filtroDistanza;
 
         const response = useVicini
@@ -345,393 +412,244 @@ function App() {
         const data = response.data || response;
 
         if (data.successo && data.cani) {
-          const caniFormattati = data.cani.map(dog => {
-            const rawFile = dog.fotoUrl || dog.foto_url || "";
+          setDogs(data.cani.map(dog => {
+            const rawFile  = dog.fotoUrl || dog.foto_url || "";
             const nomeFile = rawFile.replace('uploads/', '').replace('/uploads/', '');
             return {
-              ...dog,
-              name: dog.nome,
+              ...dog, name: dog.nome,
               photo: nomeFile ? `/uploads/${nomeFile}` : "https://via.placeholder.com/400",
               breed: dog.razza,
               distance: dog.distanza_km != null ? parseFloat(dog.distanza_km) : null,
-              lat: dog.proprietario?.latitudine ?? null,
-              lng: dog.proprietario?.longitudine ?? null,
+              lat: dog.proprietario?.latitudine ?? null, lng: dog.proprietario?.longitudine ?? null,
               proprietarioNome: dog.proprietario?.nome ?? null,
             };
-          });
-          setDogs(caniFormattati);
+          }));
         } else {
-          setDogs([]);
-          setFeedError(data.errore || "errore_generico");
+          setDogs([]); setFeedError(data.errore || "errore_generico");
         }
       } catch (err) {
-        console.error("Errore caricamento feed:", err);
         if (err.status === 403) {
-          // Account bannato mentre la sessione era attiva
           const banned = { ...user, isBanned: true, isBloccato: true };
-          setUser(banned);
-          localStorage.setItem("user", JSON.stringify(banned));
-          return;
+          setUser(banned); localStorage.setItem("user", JSON.stringify(banned)); return;
         }
-        setDogs([]);
-        setFeedError("errore_server");
-      } finally {
-        setLoading(false);
-      }
+        setDogs([]); setFeedError("errore_server");
+      } finally { setLoading(false); }
     };
-
     caricaFeedReale();
-  }, [currentPage, user, filtroIntento, filtroDistanza, userLocation, selectedCaneIdx]);
+  }, [location.pathname, user, filtroIntento, filtroDistanza, userLocation, selectedCaneIdx]);
 
-  // 5. Reducer per i Match
-  const initialState = {
-    requests: [],
-    matches: [],
-  };
+  const initialState       = { requests: [], matches: [] };
+  const [state, dispatch]  = useReducer(dogReducer, initialState);
 
-  // collega lo stato al reducer
-  const [state, dispatch] = useReducer(dogReducer, initialState);
-
-  // 6. Logica Match
   const sendLike = async (dogId, intento) => {
-    const selectedDogData = dogs.find((d) => d.id === dogId);
+    const selectedDogData = dogs.find(d => d.id === dogId);
     if (!selectedDogData || !user) return;
-
     const caniUtente = user.iMieiCani || user.cani || [];
-    const mioCaneId = (caniUtente[selectedCaneIdx] ?? caniUtente[0])?.id;
-    if (!mioCaneId) {
-      alert("Nessun cane associato al tuo account.");
-      return;
-    }
-
+    const mioCaneId  = (caniUtente[selectedCaneIdx] ?? caniUtente[0])?.id;
+    if (!mioCaneId) { alert("Nessun cane associato al tuo account."); return; }
     try {
       const result = await inviaLike(mioCaneId, dogId, intento);
       if (!result.successo) return;
-
-      setDogs((prev) => prev.filter((d) => d.id !== dogId));
+      setDogs(prev => prev.filter(d => d.id !== dogId));
       setSelectedDog(null);
-
       if (result.isMatch) {
-        const matchDog = {
-          ...selectedDogData,
-          interazioneId: result.data?.id || null,
-        };
-        dispatch({ type: "AGGIUNGI_MATCH_DIRETTO", payload: matchDog });
+        dispatch({ type: "AGGIUNGI_MATCH_DIRETTO", payload: { ...selectedDogData, interazioneId: result.data?.id || null } });
         triggerMatchAnimation();
-        setTimeout(() => { setCurrentPage("messages"); }, 2000);
+        setTimeout(() => navigate('/messages'), 2000);
       }
-    } catch (err) {
-      console.error("Errore durante il like:", err);
-    }
+    } catch (err) { console.error("Errore durante il like:", err); }
   };
 
-  // Match (accoppiamento) — solo per cani compatibili
   const handleAcceptMatch = (dogId) => sendLike(dogId, 'accoppiamento');
-
-  // Gioco — disponibile per tutti i cani
-  const handlePlayClick = (dogId) => sendLike(dogId, 'gioco');
-
+  const handlePlayClick   = (dogId) => sendLike(dogId, 'gioco');
 
   const triggerMatchAnimation = () => {
     setShowMatchAlert(true);
     setTimeout(() => setShowMatchAlert(false), 2000);
   };
 
-  // Accetta richiesta di match
   const handleAccettaRichiesta = async (richiesta) => {
     const mioCaneId = user?.iMieiCani?.[0]?.id;
     if (!mioCaneId) return;
     try {
       const result = await inviaLike(mioCaneId, richiesta.cane.id, richiesta.intento);
       if (!result.successo) return;
-      // Rimuovi dalla lista richieste
       setRichieste(prev => prev.filter(r => r.interazioneId !== richiesta.interazioneId));
       setNotifications(prev => ({ ...prev, richieste: Math.max(0, prev.richieste - 1) }));
-
       if (result.isMatch) {
-        const rawFile = richiesta.cane.fotoUrl ?? richiesta.cane.foto_url ?? "";
+        const rawFile  = richiesta.cane.fotoUrl ?? richiesta.cane.foto_url ?? "";
         const nomeFile = rawFile.replace('uploads/', '').replace('/uploads/', '');
-        const matchDog = {
-          ...richiesta.cane,
-          name: richiesta.cane.nome,
-          photo: nomeFile ? `/uploads/${nomeFile}` : "https://via.placeholder.com/400",
-          interazioneId: result.data?.id || null,
-        };
-        dispatch({ type: "AGGIUNGI_MATCH_DIRETTO", payload: matchDog });
+        dispatch({
+          type: "AGGIUNGI_MATCH_DIRETTO",
+          payload: {
+            ...richiesta.cane, name: richiesta.cane.nome,
+            photo: nomeFile ? `/uploads/${nomeFile}` : "https://via.placeholder.com/400",
+            interazioneId: result.data?.id || null,
+          },
+        });
         triggerMatchAnimation();
-        setTimeout(() => setCurrentPage("messages"), 2000);
+        setTimeout(() => navigate('/messages'), 2000);
       }
-    } catch (err) {
-      console.error("Errore accetta richiesta:", err);
-    }
+    } catch (err) { console.error("Errore accetta richiesta:", err); }
   };
 
-  // Rifiuta richiesta di match
   const handleRifiutaRichiesta = async (richiesta) => {
     try {
       await rifiutaRichiesta(richiesta.interazioneId);
       setRichieste(prev => prev.filter(r => r.interazioneId !== richiesta.interazioneId));
       setNotifications(prev => ({ ...prev, richieste: Math.max(0, prev.richieste - 1) }));
-    } catch (err) {
-      console.error("Errore rifiuta richiesta:", err);
-    }
+    } catch (err) { console.error("Errore rifiuta richiesta:", err); }
   };
 
-  const handleStart = (page) => setCurrentPage(page);
-
-  // Aggiorna contatore notifiche
   useEffect(() => {
-    setNotifications((prev) => ({ ...prev, matches: state.matches.length }));
+    setNotifications(prev => ({ ...prev, matches: state.matches.length }));
     localStorage.setItem("dogMatches", JSON.stringify(state.matches));
   }, [state.matches]);
 
-  // logica di blocco — controlla sia isBanned (da toJSON) sia isBloccato (fallback raw)
+  // Aspetta il controllo auth prima di renderizzare
+  if (!authChecked) return null;
+
+  // Account bannato
   if (user && (user.isBanned || user.isBloccato)) {
     return <BannedPage user={user} onLogout={handleLogout} />;
   }
 
+  // Props condivise per AuthLayout
+  const layoutProps = {
+    user, onLogout: handleLogout,
+    notifications, richieste, notifiche,
+    onNavigate: (page) => navigate('/' + page),
+    onNotificaClick: handleNotificaClick,
+    onMarkAllRead: handleMarkAllNotificheRead,
+    onAccettaRichiesta: handleAccettaRichiesta,
+    onRifiutaRichiesta: handleRifiutaRichiesta,
+    onViewProfilo: (utenteId) => navigate('/view-profile/' + utenteId),
+    selectedDog,
+    onCloseDog: () => setSelectedDog(null),
+    onAcceptDog: handleAcceptMatch,
+    showMatchAlert,
+    toastRichiesta,
+    onDismissToast: () => setToastRichiesta({ show: false, notifica: null }),
+  };
+
   return (
-    <>
-      {currentPage === "landing" && <PrimaPagina onStart={handleStart} />}
-      {currentPage === "login" && (
-        <Login onLogin={handleLoginSuccess} onSwitch={setCurrentPage} />
-      )}
+    <Routes>
+      {/* ── Rotte pubbliche ── */}
+      <Route path="/"
+        element={user
+          ? <Navigate to="/home" replace />
+          : <PrimaPagina onStart={(page) => navigate('/' + page)} />}
+      />
+      <Route path="/login"
+        element={user
+          ? <Navigate to="/home" replace />
+          : <Login onLogin={handleLoginSuccess} onSwitch={(page) => navigate('/' + page)} />}
+      />
+      <Route path="/register"
+        element={user
+          ? <Navigate to="/home" replace />
+          : <Registrazione onSwitch={(page) => navigate('/' + page)} onRegisterSuccess={handleRegisterSuccess} />}
+      />
 
-      {currentPage === "register" && (
-        <Registrazione
-          onSwitch={setCurrentPage}
-          onRegisterSuccess={handleRegisterSuccess}
-        />
-      )}
-
-      {["home", "profile", "messages", "admin", "requests", "viewProfile"].includes(currentPage) && user && (
-        <div className="d-flex flex-column min-vh-100" style={{ backgroundColor: "#f8fbfb" }}>
-          <Navbar
-            user={user}
-            onLogout={handleLogout}
-            notifications={notifications}
-            richieste={richieste}
-            onNavigate={(page) => setCurrentPage(page)}
-            notifiche={notifiche}
-            onNotificaClick={handleNotificaClick}
-            onMarkAllRead={handleMarkAllNotificheRead}
-            onAccettaRichiesta={handleAccettaRichiesta}
-            onRifiutaRichiesta={handleRifiutaRichiesta}
-            onViewProfilo={(utenteId) => { setViewProfileId(utenteId); setCurrentPage("viewProfile"); }}
-          />
-
-          <main className="container-fluid px-2 px-md-5 flex-grow-1 py-4">
-            {currentPage === "requests" && (
-              <RichiesteMatch
-                richieste={richieste}
-                onAccetta={handleAccettaRichiesta}
-                onRifiuta={handleRifiutaRichiesta}
-                onBack={() => setCurrentPage("home")}
-              />
-            )}
-
-            {currentPage === "admin" && user?.ruolo === 'admin' && (
-              <AdminPanel onBack={() => setCurrentPage("home")} />
-            )}
-
-            {currentPage === "profile" && (
-              <UserProfilo
+      {/* ── Rotte protette ── */}
+      <Route path="/home" element={
+        !user ? <Navigate to="/" replace /> :
+        <AuthLayout {...layoutProps}>
+          <div className="row g-3 g-lg-4">
+            <div className="col-xl-9 col-lg-8">
+              <Home
+                dogs={dogs} loading={loading} feedError={feedError}
+                setSelectedDog={setSelectedDog}
+                handleAcceptMatch={handleAcceptMatch} handlePlayClick={handlePlayClick}
                 user={user}
-                onUpdate={(updatedUser) => {
-                  setUser(updatedUser);
-                  localStorage.setItem("user", JSON.stringify(updatedUser));
-                }}
-                onLogout={handleLogout}
+                filtroIntento={filtroIntento} setFiltroIntento={setFiltroIntento}
+                filtroDistanza={filtroDistanza} setFiltroDistanza={setFiltroDistanza}
+                onNavigate={(page) => navigate('/' + page)}
+                hasLocation={!!userLocation}
+                selectedCaneIdx={selectedCaneIdx}
+                onSwitchCane={(idx) => { setSelectedCaneIdx(idx); setDogs([]); }}
               />
-            )}
-
-            {currentPage === "viewProfile" && viewProfileId && (
-              <ViewProfiloUtente
-                utenteId={viewProfileId}
-                onBack={() => setCurrentPage("home")}
-              />
-            )}
-
-            {currentPage === "home" && (
-              <div className="row g-3 g-lg-4">
-                <div className="col-xl-9 col-lg-8">
-                  <Home
-                    dogs={dogs}
-                    loading={loading}
-                    feedError={feedError}
-                    setSelectedDog={setSelectedDog}
-                    handleAcceptMatch={handleAcceptMatch}
-                    handlePlayClick={handlePlayClick}
-                    user={user}
-                    filtroIntento={filtroIntento}
-                    setFiltroIntento={setFiltroIntento}
-                    filtroDistanza={filtroDistanza}
-                    setFiltroDistanza={setFiltroDistanza}
-                    onNavigate={(page) => setCurrentPage(page)}
-                    hasLocation={!!userLocation}
-                    selectedCaneIdx={selectedCaneIdx}
-                    onSwitchCane={(idx) => { setSelectedCaneIdx(idx); setDogs([]); }}
-                  />
-                </div>
-
-                <div className="col-xl-3 col-lg-4">
-                  <div className="sticky-top" style={{ top: "90px" }}>
-                    {user?.ruolo === 'admin' ? (
-                      <AdminMatchSidebar />
-                    ) : (
-                      <div className="bg-white rounded-4 shadow-sm p-3 border-0">
-                        <h6 className="fw-bold mb-3 border-bottom pb-2 text-secondary">
-                          I tuoi Match ({state.matches.length})
-                        </h6>
-                        <div style={{ maxHeight: "70vh", overflowY: "auto" }}>
-                          {state.matches.length === 0 ? (
-                            <p className="text-muted mb-0 small text-center py-4">Ancora nessun match</p>
-                          ) : (
-                            <MatchList
-                              matches={state.matches}
-                              msgNotifiche={msgNotifiche}
-                              onSelectMatch={apriChat}
-                            />
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {currentPage === "messages" && (
-              <Messaggi
-                matches={state.matches}
-                onBack={() => { setCurrentPage('home'); setSelectedMatchToOpen(null); }}
-                msgNotifiche={msgNotifiche}
-                clearMsgNotifica={clearMsgNotifica}
-                initialMatch={selectedMatchToOpen}
-                onChatChange={(id) => { chatApertaIdRef.current = id; }}
-              />
-            )}
-          </main>
-
-          <Footer />
-
-          {selectedDog && (
-            <InfoCane
-              dog={selectedDog}
-              onClose={() => setSelectedDog(null)}
-              onAccept={handleAcceptMatch}
-            />
-          )}
-          {showMatchAlert && <MatchAnimation />}
-          <SnoutBot />
-
-          {/* Toast: notifica interattiva in tempo reale */}
-          {toastRichiesta.show && toastRichiesta.notifica && (() => {
-            const n = toastRichiesta.notifica;
-            const isRichiesta = n.tipo === 'richiesta_match' && n.payload;
-            const payload = n.payload;
-            const pendingRichiesta = isRichiesta
-              ? richieste.find(r => r.interazioneId === payload.interazioneId)
-              : null;
-            const caneImg = (pendingRichiesta?.cane?.fotoUrl ?? payload?.cane?.fotoUrl)
-              ? (() => {
-                  const raw = pendingRichiesta?.cane?.fotoUrl ?? payload?.cane?.fotoUrl;
-                  if (raw.startsWith('http')) return raw;
-                  return `/uploads/${raw.replace('uploads/', '').replace('/uploads/', '')}`;
-                })()
-              : null;
-            const caneName = pendingRichiesta?.cane?.nome ?? payload?.cane?.nome;
-            const intentoText = (pendingRichiesta?.intento ?? payload?.intento) === 'accoppiamento'
-              ? 'un Match' : 'giocare insieme';
-            const dismiss = () => setToastRichiesta({ show: false, notifica: null });
-
-            return (
-              <div className="position-fixed bottom-0 end-0 p-3" style={{ zIndex: 9999 }}>
-                <div className="shadow-lg" style={{
-                  backgroundColor: 'white', borderRadius: '18px', width: '320px',
-                  border: '1.5px solid #f0e0e8', overflow: 'hidden',
-                  animation: 'slideInUp 0.25s ease-out',
-                }}>
-                  {/* Barra superiore */}
-                  <div
-                    className="d-flex align-items-center justify-content-between px-3 py-2"
-                    style={{ background: isRichiesta ? 'linear-gradient(90deg, #EFA6BA, #7FBCC8)' : '#7FBCC8' }}
-                  >
-                    <div className="d-flex align-items-center gap-2 text-white">
-                      <i className="bi bi-bell-fill" style={{ fontSize: '0.85rem' }} />
-                      <span className="fw-bold" style={{ fontSize: '0.82rem' }}>
-                        {isRichiesta ? 'Nuova richiesta' : 'Notifica'}
-                      </span>
+            </div>
+            <div className="col-xl-3 col-lg-4">
+              <div className="sticky-top" style={{ top: "90px" }}>
+                {user?.ruolo === 'admin' ? (
+                  <AdminMatchSidebar />
+                ) : (
+                  <div className="bg-white rounded-4 shadow-sm p-3 border-0">
+                    <h6 className="fw-bold mb-3 border-bottom pb-2 text-secondary">
+                      I tuoi Match ({state.matches.length})
+                    </h6>
+                    <div style={{ maxHeight: "70vh", overflowY: "auto" }}>
+                      {state.matches.length === 0
+                        ? <p className="text-muted mb-0 small text-center py-4">Ancora nessun match</p>
+                        : <MatchList matches={state.matches} msgNotifiche={msgNotifiche} onSelectMatch={apriChat} />
+                      }
                     </div>
-                    <button className="btn-close btn-close-white" style={{ fontSize: '0.6rem' }} onClick={dismiss} />
                   </div>
-
-                  {/* Corpo */}
-                  <div className="px-3 py-3">
-                    {isRichiesta ? (
-                      <>
-                        {/* Foto + nome + messaggio */}
-                        <div className="d-flex align-items-center gap-2 mb-3">
-                          {caneImg ? (
-                            <img
-                              src={caneImg}
-                              alt={caneName}
-                              onError={(e) => { e.target.src = 'https://cdn-icons-png.flaticon.com/512/616/616408.png'; }}
-                              style={{ width: '52px', height: '52px', borderRadius: '50%', objectFit: 'cover', border: '2.5px solid #EFA6BA', flexShrink: 0 }}
-                            />
-                          ) : (
-                            <div style={{ width: '52px', height: '52px', borderRadius: '50%', backgroundColor: '#fef6f8', border: '2px solid #EFA6BA', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <i className="bi bi-heart-fill" style={{ color: '#EFA6BA', fontSize: '1.4rem' }} />
-                            </div>
-                          )}
-                          <div>
-                            {caneName && (
-                              <div className="fw-bold" style={{ fontSize: '0.9rem', color: '#1c1e21' }}>{caneName}</div>
-                            )}
-                            <div style={{ fontSize: '0.78rem', color: '#777' }}>
-                              vorrebbe {intentoText} con il tuo cane!
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Bottoni azione */}
-                        <div className="d-flex gap-2">
-                          <button
-                            className="btn btn-sm rounded-pill fw-bold text-white flex-grow-1"
-                            style={{ backgroundColor: '#28a745', border: 'none', fontSize: '0.82rem' }}
-                            onClick={() => {
-                              if (pendingRichiesta) handleAccettaRichiesta(pendingRichiesta);
-                              dismiss();
-                            }}
-                          >
-                            <i className="bi bi-check-lg me-1" />Accetta
-                          </button>
-                          <button
-                            className="btn btn-sm rounded-pill fw-bold flex-grow-1"
-                            style={{ backgroundColor: '#fff3f3', color: '#dc3545', border: '1.5px solid #f5c6cb', fontSize: '0.82rem' }}
-                            onClick={() => {
-                              if (pendingRichiesta) handleRifiutaRichiesta(pendingRichiesta);
-                              dismiss();
-                            }}
-                          >
-                            <i className="bi bi-x-lg me-1" />Rifiuta
-                          </button>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="d-flex align-items-center gap-2">
-                        <i className="bi bi-bell text-muted" style={{ fontSize: '1.1rem' }} />
-                        <div style={{ fontSize: '0.82rem', color: '#555' }}>{n.messaggio}</div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                )}
               </div>
-            );
-          })()}
-        </div>
-      )}
-    </>
+            </div>
+          </div>
+        </AuthLayout>
+      } />
+
+      <Route path="/messages" element={
+        !user ? <Navigate to="/" replace /> :
+        <AuthLayout {...layoutProps}>
+          <Messaggi
+            matches={state.matches}
+            onBack={() => { setSelectedMatchToOpen(null); navigate('/home'); }}
+            msgNotifiche={msgNotifiche}
+            clearMsgNotifica={clearMsgNotifica}
+            initialMatch={selectedMatchToOpen}
+            onChatChange={(id) => { chatApertaIdRef.current = id; }}
+          />
+        </AuthLayout>
+      } />
+
+      <Route path="/profile" element={
+        !user ? <Navigate to="/" replace /> :
+        <AuthLayout {...layoutProps}>
+          <UserProfilo
+            user={user}
+            onUpdate={(updatedUser) => {
+              setUser(updatedUser);
+              localStorage.setItem("user", JSON.stringify(updatedUser));
+            }}
+            onLogout={handleLogout}
+          />
+        </AuthLayout>
+      } />
+
+      <Route path="/requests" element={
+        !user ? <Navigate to="/" replace /> :
+        <AuthLayout {...layoutProps}>
+          <RichiesteMatch
+            richieste={richieste}
+            onAccetta={handleAccettaRichiesta}
+            onRifiuta={handleRifiutaRichiesta}
+            onBack={() => navigate('/home')}
+          />
+        </AuthLayout>
+      } />
+
+      <Route path="/admin" element={
+        !user || user.ruolo !== 'admin' ? <Navigate to="/" replace /> :
+        <AuthLayout {...layoutProps}>
+          <AdminPanel onBack={() => navigate('/home')} />
+        </AuthLayout>
+      } />
+
+      <Route path="/view-profile/:id" element={
+        !user ? <Navigate to="/" replace /> :
+        <AuthLayout {...layoutProps}>
+          <ViewProfiloWrapper onBack={() => navigate(-1)} />
+        </AuthLayout>
+      } />
+
+      {/* Fallback */}
+      <Route path="*" element={<Navigate to={user ? "/home" : "/"} replace />} />
+    </Routes>
   );
 }
 

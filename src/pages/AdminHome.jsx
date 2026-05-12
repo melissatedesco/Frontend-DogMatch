@@ -59,7 +59,7 @@ const AdminHome = ({ onNavigate }) => {
       }
     };
     fetchAll();
-  }, []);
+  }, );
 
   const eliminaCane = async (id) => {
     if (!window.confirm("Eliminare questo cane? L'azione non è reversibile.")) return;
@@ -74,7 +74,7 @@ const AdminHome = ({ onNavigate }) => {
     } catch { /* silent */ } finally { setDeletingId(null); }
   };
 
-  const toggleSegnalazione = async (id, corrente) => {
+  const toggleSegnalazione = async (id) => {
     setSegnandoId(id);
     try {
       const res = await fetch(`/api/admin/cani/${id}/segnalazione`, { method: "PUT", headers });
