@@ -17,16 +17,27 @@ const Registrazione = ({ onSwitch, onRegisterSuccess }) => {
     caneTaglia: "Media",
     pedigreeDoc: null,
     fotoCane: null,
+    fotoUtente: null,
   });
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  // Anteprima foto cane
   const [fotoPreview, setFotoPreview] = useState(null);
   const fotoInputRef = useRef(null);
+  // Anteprima foto utente
+  const [fotoUtentePreview, setFotoUtentePreview] = useState(null);
+  const fotoUtenteInputRef = useRef(null);
 
   const handleChange = (e) => {
     const { name, value, files } = e.target;
     if (name === "fotoCane" && files && files[0]) {
       setFormData({ ...formData, fotoCane: files[0] });
       setFotoPreview(URL.createObjectURL(files[0]));
+    } else if (name === "fotoUtente" && files && files[0]) {
+      setFormData({ ...formData, fotoUtente: files[0] });
+      setFotoUtentePreview(URL.createObjectURL(files[0]));
     } else {
       setFormData({ ...formData, [name]: files ? files[0] : value });
     }
@@ -73,6 +84,9 @@ const Registrazione = ({ onSwitch, onRegisterSuccess }) => {
       setLoading(false);
     }
   };
+
+  const passwordsMatch = formData.password !== "" && formData.password === confirmPassword;
+  const confirmTouched = confirmPassword !== "";
 
   const inputStyle = {
     borderRadius: "25px",
@@ -152,6 +166,47 @@ const Registrazione = ({ onSwitch, onRegisterSuccess }) => {
                 <div style={{ flex: 1, height: "1px", background: "linear-gradient(270deg, #7FBCC8, transparent)" }} />
               </div>
 
+              {/* Foto profilo utente */}
+              <div className="mb-4 text-center">
+                <div
+                  className="position-relative d-inline-block"
+                  onClick={() => fotoUtenteInputRef.current.click()}
+                  style={{ cursor: "pointer" }}
+                >
+                  {fotoUtentePreview ? (
+                    <div style={{
+                      background: "linear-gradient(135deg, #7FBCC8, #EFA6BA)",
+                      borderRadius: "50%", padding: "3px", display: "inline-block",
+                      boxShadow: "0 4px 16px rgba(127,188,200,0.35)",
+                    }}>
+                      <img
+                        src={fotoUtentePreview}
+                        alt="Foto profilo"
+                        className="rounded-circle"
+                        style={{ width: "88px", height: "88px", objectFit: "cover", display: "block", backgroundColor: "#f0f9fa" }}
+                      />
+                    </div>
+                  ) : (
+                    <div style={{
+                      width: 94, height: 94, borderRadius: "50%",
+                      background: "linear-gradient(135deg, #d0ecf8, #90cce0)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      boxShadow: "0 4px 16px rgba(127,188,200,0.3)",
+                    }}>
+                      <i className="bi bi-person-fill" style={{ fontSize: "44px", color: "#5b85b8" }} />
+                    </div>
+                  )}
+                  <div
+                    className="position-absolute bottom-0 end-0 rounded-circle shadow d-flex align-items-center justify-content-center"
+                    style={{ width: "30px", height: "30px", backgroundColor: "#EFA6BA", border: "2px solid white", zIndex: 2 }}
+                  >
+                    <i className="bi bi-camera-fill" style={{ fontSize: "13px", color: "white" }} />
+                  </div>
+                </div>
+                <input ref={fotoUtenteInputRef} name="fotoUtente" type="file" accept="image/*" className="d-none" onChange={handleChange} />
+                <p className="small mt-2 mb-0" style={{ color: "#7FBCC8" }}>Foto profilo (opzionale)</p>
+              </div>
+
               <div className="row">
                 <div className="col-md-6 mb-3">
                   <label style={labelStyle}>NOME</label>
@@ -170,7 +225,60 @@ const Registrazione = ({ onSwitch, onRegisterSuccess }) => {
 
               <div className="mb-3">
                 <label style={labelStyle}>PASSWORD</label>
-                <input name="password" type="password" className="form-control" style={inputStyle} value={formData.password} onChange={handleChange} required />
+                <div className="position-relative">
+                  <input
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    className="form-control"
+                    style={{ ...inputStyle, paddingRight: "2.8rem" }}
+                    value={formData.password}
+                    onChange={handleChange}
+                    required
+                  />
+                  <span
+                    onClick={() => setShowPassword(prev => !prev)}
+                    style={{ position: "absolute", right: "0.9rem", top: "50%", transform: "translateY(-50%)", cursor: "pointer", color: "#7FBCC8", fontSize: "1rem", userSelect: "none" }}
+                  >
+                    <i className={showPassword ? "bi bi-eye-slash" : "bi bi-eye"} />
+                  </span>
+                </div>
+              </div>
+
+              <div className="mb-3">
+                <label style={labelStyle}>CONFERMA PASSWORD</label>
+                <div className="position-relative">
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    className="form-control"
+                    style={{
+                      ...inputStyle,
+                      paddingRight: "2.8rem",
+                      border: confirmTouched
+                        ? `1.5px solid ${passwordsMatch ? "#28a745" : "#dc3545"}`
+                        : inputStyle.border,
+                    }}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Ripeti la password"
+                    required
+                  />
+                  <span
+                    onClick={() => setShowConfirmPassword(prev => !prev)}
+                    style={{ position: "absolute", right: "0.9rem", top: "50%", transform: "translateY(-50%)", cursor: "pointer", color: "#7FBCC8", fontSize: "1rem", userSelect: "none" }}
+                  >
+                    <i className={showConfirmPassword ? "bi bi-eye-slash" : "bi bi-eye"} />
+                  </span>
+                  {confirmTouched && passwordsMatch && (
+                    <span style={{ position: "absolute", right: "2.4rem", top: "50%", transform: "translateY(-50%)", color: "#28a745", fontSize: "0.9rem" }}>
+                      <i className="bi bi-check-circle-fill" />
+                    </span>
+                  )}
+                </div>
+                {confirmTouched && !passwordsMatch && (
+                  <p className="mb-0 mt-1" style={{ color: "#dc3545", fontSize: "0.75rem", paddingLeft: "0.8rem" }}>
+                    Le password non coincidono
+                  </p>
+                )}
               </div>
 
               <div className="mb-3">
@@ -185,8 +293,9 @@ const Registrazione = ({ onSwitch, onRegisterSuccess }) => {
 
               <button
                 type="submit"
+                disabled={!passwordsMatch}
                 className="btn w-100 text-white rounded-pill fw-bold py-2 mb-3 shadow-sm"
-                style={{ backgroundColor: "#7FBCC8", border: "none" }}
+                style={{ backgroundColor: passwordsMatch ? "#7FBCC8" : "#aaa", border: "none", transition: "background-color 0.2s" }}
               >
                 Avanti <i className="bi bi-arrow-right ms-1" />
               </button>

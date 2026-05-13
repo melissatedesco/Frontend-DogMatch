@@ -57,7 +57,7 @@ const AdminPanel = ({ onBack }) => {
     } catch { /* silent */ } finally { setSavingId(null); }
   };
 
-  const toggleBlocco = async (id, currentBloccato) => {
+  const toggleBlocco = async (id) => {
     setBlockingId(id);
     try {
       const res  = await fetch(`/api/admin/utenti/${id}/blocco`, { method: "PUT", headers: { Authorization: `Bearer ${token}` } });
@@ -209,7 +209,7 @@ const AdminPanel = ({ onBack }) => {
           <div className="d-flex flex-column gap-2">
             {filteredUtenti.map(utente => {
               const cane        = utente.iMieiCani?.[0];
-              const hasPedigree = (cane?.documenti?.length ?? 0) > 0;
+              const hasPedigree = !!(cane?.pedigreeUrl ?? cane?.pedigree_url);
               const borderColor = utente.isBloccato ? "#f5c6cb" : utente.isVerificato ? "#c3e6cb" : hasPedigree ? "#ffc107" : "#e9ecef";
 
               return (
@@ -226,7 +226,7 @@ const AdminPanel = ({ onBack }) => {
                   <div className="flex-grow-1" style={{ minWidth: 0 }}>
                     <div className="d-flex align-items-center gap-2 flex-wrap">
                       <span className="fw-bold" style={{ color: "#1c1e21" }}>{utente.nome} {utente.cognome}</span>
-                      {utente.isAdmin && (
+                      {utente.ruolo === 'admin' && (
                         <span className="badge rounded-pill px-2 py-1" style={{ backgroundColor: "#7FBCC8", color: "white", fontSize: "0.65rem" }}>
                           <i className="bi bi-shield-fill me-1" />Admin
                         </span>
@@ -286,7 +286,7 @@ const AdminPanel = ({ onBack }) => {
                           : <><i className="bi bi-patch-check me-1" />Verifica</>
                       }
                     </button>
-                    {!utente.isAdmin && (
+                    {utente.ruolo !== 'admin' && (
                       <>
                         <button
                           className="btn btn-sm rounded-pill fw-bold px-3"
@@ -335,7 +335,7 @@ const AdminPanel = ({ onBack }) => {
         ) : (
           <div className="d-flex flex-column gap-2">
             {filteredCani.map(cane => {
-              const hasPedigree = (cane.documenti?.length ?? 0) > 0;
+              const hasPedigree = !!(cane.pedigreeUrl ?? cane.pedigree_url);
 
               return (
                 <div key={cane.id}
