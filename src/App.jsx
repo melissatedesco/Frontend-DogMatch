@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useNavigate, useLocation, useParams } from "re
 import dogReducer from "./store/reducers/dogReducer";
 import MatchList from "./components/ListaRichieste";
 import AdminMatchSidebar from "./components/AdminMatchSidebar";
-import InfoCane from "./modal/InfoCane";
+import InfoCane from "./components/modals/InfoCane";
 import Navbar from "./components/Navbar";
 import MatchAnimation from "./components/MatchAnimation";
 import UserProfilo from "./pages/UserProfilo";
@@ -21,6 +21,7 @@ import { dogService } from "./services/dogServices";
 import { inviaLike, getRichiesteRicevute, rifiutaRichiesta } from "./services/interazioneServices";
 import { getSocket } from "./services/socketService";
 import { fetchNotifiche, segnaNotificaLetta, segnaAllNotificheLette } from "./services/notificaServices";
+import { useAuth } from "./hooks/useAuth";
 
 function ViewProfiloWrapper({ onBack }) {
   const { id } = useParams();
@@ -150,7 +151,9 @@ function App() {
   const location  = useLocation();
 
   const [dogs, setDogs]               = useState([]);
-  const [loading, setLoading]         = useState(true);
+  const { user, setUser, authChecked, handleLoginSuccess, handleRegisterSuccess, handleLogout } = useAuth();
+
+  const [loading, setLoading]         = useState(false);
   const [feedError, setFeedError]     = useState(null);
   const [selectedDog, setSelectedDog] = useState(null);
   const [filtroIntento, setFiltroIntento]     = useState("");
@@ -158,8 +161,6 @@ function App() {
   const [userLocation, setUserLocation]       = useState(null);
   const [selectedCaneIdx, setSelectedCaneIdx] = useState(0);
   const [showMatchAlert, setShowMatchAlert]   = useState(false);
-  const [user, setUser]               = useState(null);
-  const [authChecked, setAuthChecked] = useState(false);
 
   const [notifications, setNotifications]   = useState({ messages: 0, matches: 0, richieste: 0 });
   const [richieste, setRichieste]           = useState([]);
@@ -191,16 +192,6 @@ function App() {
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, user?.ruolo]);
-
-  useEffect(() => {
-    const token     = localStorage.getItem('token');
-    const savedUser = localStorage.getItem('user');
-    if (token && savedUser) {
-      try { setUser(JSON.parse(savedUser)); } catch { localStorage.clear(); }
-    }
-    setAuthChecked(true);
-    setLoading(false);
-  }, []);
 
   useEffect(() => {
     if (location.pathname === '/messages') {
@@ -237,6 +228,7 @@ function App() {
               if (!altroCane) return null;
               const rawFile  = altroCane.fotoUrl ?? "";
               const nomeFile = rawFile.replace('uploads/', '').replace('/uploads/', '');
+              const ultimoMsg = interazione.conversazione?.[0] ?? null;
               return {
                 ...altroCane, interazioneId: interazione.id,
                 intento: interazione.intento,
@@ -244,6 +236,7 @@ function App() {
                 nomeMioCane: mioCane?.nome ?? null,
                 proprietarioId: altroCane.utenteId ? String(altroCane.utenteId) : null,
                 photo: nomeFile ? `/uploads/${nomeFile}` : "https://via.placeholder.com/400",
+                ultimoMessaggio: ultimoMsg ? { testo: ultimoMsg.contenuto, data: ultimoMsg.createdAt } : null,
               };
             }).filter(Boolean);
             dispatch({ type: "CARICA_MATCHES", payload: formattati });
@@ -255,28 +248,6 @@ function App() {
     fetchNotifiche().then(d => { if (d.successo) setNotifiche(d.notifiche); }).catch(() => {});
     return () => clearInterval(pollingRef.current);
   }, [user, aggiornaSollecitiRichieste]);
-
-  const handleRegisterSuccess = (userData) => {
-    localStorage.removeItem('dogMatches');
-    localStorage.setItem('user', JSON.stringify(userData));
-    setUser(userData);
-    navigate('/home');
-  };
-
-  const handleLoginSuccess = (userData) => {
-    localStorage.removeItem('dogMatches');
-    setUser(userData);
-    localStorage.setItem('user', JSON.stringify(userData));
-    navigate('/home');
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('dogMatches');
-    setUser(null);
-    navigate('/');
-  };
 
   useEffect(() => {
     if (!user) return;

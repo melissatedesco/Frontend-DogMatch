@@ -1,0 +1,16 @@
+export const RAZZE = [
+  "Affenpinscher", "Akita", "Alano", "Barbone", "Bassotto",
+  "Beagle", "Bernese", "Border Collie", "Boston Terrier", "Boxer",
+  "Bracco Italiano", "Bulldog Francese", "Bulldog Inglese", "Cane Corso",
+  "Cavalier King Charles Spaniel", "Chihuahua", "Chow Chow", "Cocker Spaniel",
+  "Collie", "Coton de Tulear", "Dalmata", "Dobermann", "Dogo Argentino",
+  "Golden Retriever", "Husky Siberiano", "Jack Russell Terrier",
+  "Labrador Retriever", "Lagotto Romagnolo", "Leonberger", "Lhasa Apso",
+  "Lupo Cecoslovacco", "Maltese", "Maremma", "Maremmano Abruzzese",
+  "Mastino Napoletano", "Meticcio", "Pastore Belga", "Pastore Australiano",
+  "Pastore Tedesco", "Pinscher", "Pitbull", "Pointer", "Pomerania",
+  "Pug", "Rottweiler", "Samoiedo", "San Bernardo", "Schnauzer",
+  "Setter Irlandese", "Shar Pei", "Shiba Inu", "Shih Tzu",
+  "Spinone Italiano", "Staffordshire Bull Terrier", "Terranova",
+  "West Highland White Terrier", "Weimaraner", "Yorkshire Terrier",
+];
