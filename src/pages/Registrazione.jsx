@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import logo from "../assets/logo.png";
 
 const Registrazione = ({ onSwitch, onRegisterSuccess }) => {
   const [step, setStep] = useState(1);
@@ -142,15 +143,19 @@ const Registrazione = ({ onSwitch, onRegisterSuccess }) => {
   return (
     <div
       className="min-vh-100 d-flex align-items-center justify-content-center px-3 py-5"
-      style={{ background: "linear-gradient(135deg, #e4f4f8 0%, #fdedf4 100%)" }}
+      style={{ background: "linear-gradient(135deg, #e8f4f8 0%, #f5f5f5 40%, #fdedf4 100%)", position: "relative", overflow: "hidden" }}
     >
-      <div className="card border-0 shadow-lg" style={{ borderRadius: "30px", maxWidth: "500px", width: "100%", overflow: "hidden", backgroundColor: "#f5f5f5" }}>
+      {/* Bolle decorative */}
+      <div style={{ position: "fixed", top: "-80px", left: "-80px", width: "320px", height: "320px", borderRadius: "50%", background: "radial-gradient(circle, rgba(127,188,200,0.18) 0%, transparent 70%)", filter: "blur(30px)", pointerEvents: "none" }} />
+      <div style={{ position: "fixed", bottom: "-60px", right: "-60px", width: "280px", height: "280px", borderRadius: "50%", background: "radial-gradient(circle, rgba(239,166,186,0.18) 0%, transparent 70%)", filter: "blur(30px)", pointerEvents: "none" }} />
+
+      <div className="border-0 shadow-lg" style={{ borderRadius: "28px", maxWidth: "500px", width: "100%", overflow: "hidden", backgroundColor: "rgba(255,255,255,0.75)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", border: "1px solid rgba(255,255,255,0.7)", position: "relative", zIndex: 1 }}>
 
         <div style={{ height: "7px", background: "linear-gradient(90deg, #7FBCC8, #EFA6BA)" }} />
 
         <div className="px-4 pt-4 pb-4">
           <div className="text-center mb-3">
-            <img src="/src/assets/logo.png" alt="DogMatch" style={{ height: "60px", marginBottom: "8px" }} />
+            <img src={logo} alt="DogMatch" style={{ height: "60px", marginBottom: "8px" }} />
             <h2 className="fw-bold mb-0" style={{ color: "#7FBCC8" }}>Unisciti al DogMatch</h2>
             <p className="small mb-0" style={{ color: "#EFA6BA" }}>Crea il tuo profilo certificato</p>
           </div>

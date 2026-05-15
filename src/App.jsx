@@ -37,7 +37,11 @@ function AuthLayout({
   children,
 }) {
   return (
-    <div className="d-flex flex-column min-vh-100" style={{ backgroundColor: "#f8fbfb" }}>
+    <div className="d-flex flex-column min-vh-100" style={{ background: "linear-gradient(135deg, #e8f4f8 0%, #f5f5f5 40%, #fdedf4 100%)", position: "relative", overflow: "hidden" }}>
+      {/* Bolle decorative */}
+      <div style={{ position: "fixed", top: "-100px", left: "-100px", width: "400px", height: "400px", borderRadius: "50%", background: "radial-gradient(circle, rgba(127,188,200,0.15) 0%, transparent 70%)", filter: "blur(40px)", pointerEvents: "none" }} />
+      <div style={{ position: "fixed", bottom: "-80px", right: "-80px", width: "350px", height: "350px", borderRadius: "50%", background: "radial-gradient(circle, rgba(239,166,186,0.15) 0%, transparent 70%)", filter: "blur(40px)", pointerEvents: "none" }} />
+      <div style={{ position: "fixed", top: "45%", left: "60%", width: "250px", height: "250px", borderRadius: "50%", background: "radial-gradient(circle, rgba(200,220,230,0.1) 0%, transparent 70%)", filter: "blur(50px)", pointerEvents: "none" }} />
       <Navbar
         user={user}
         onLogout={onLogout}

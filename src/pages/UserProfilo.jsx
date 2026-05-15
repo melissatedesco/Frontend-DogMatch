@@ -309,7 +309,7 @@ const UserProfilo = ({ user: userProp, onUpdate, onLogout }) => {
   const sectionLabel = { color: "#1c1e21", fontSize: "0.72rem", fontWeight: "700", letterSpacing: "1px", textTransform: "uppercase" };
 
   return (
-    <div style={{ backgroundColor: "#f0f2f5", minHeight: "100vh", marginTop: "-1.5rem" }}>
+    <div style={{ background: "transparent", minHeight: "100vh", marginTop: "-1.5rem" }}>
 
       {/* ── COVER ── */}
       <div style={{ maxWidth: "900px", margin: "0 auto", position: "relative" }}>

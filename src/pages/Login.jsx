@@ -80,6 +80,8 @@ const Login = ({ onLogin, onSwitch }) => {
         border: "1px solid rgba(255,255,255,0.7)", position: "relative", zIndex: 1,
       }}>
 
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "7px", background: "linear-gradient(90deg, #7FBCC8, #EFA6BA)", borderRadius: "28px 28px 0 0" }} />
+
         {/* Avatar circolare — elemento visivo dominante */}
         <div className="text-center" style={{ marginBottom: "1.4rem" }}>
           <div style={{ position: "relative", display: "inline-block" }}>
