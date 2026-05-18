@@ -127,8 +127,8 @@ const Home = ({
       {/* Selettore cane attivo (solo se l'utente ha più cani) */}
       {caniUtente.length > 1 && (
         <div
-          className="bg-white rounded-4 shadow-sm p-3 mb-3 d-flex align-items-center gap-3 flex-wrap"
-          style={{ border: "1px solid #e8f4f8" }}
+          className="rounded-4 shadow-sm p-3 mb-3 d-flex align-items-center gap-3 flex-wrap"
+          style={{ backgroundColor: "rgba(255,255,255,0.75)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.7)" }}
         >
           <span className="small fw-bold text-muted" style={{ whiteSpace: "nowrap" }}>
             <i className="bi bi-balloon-heart me-1" style={{ color: "#EFA6BA" }} />Stai cercando per:
@@ -156,8 +156,8 @@ const Home = ({
 
       {/* Filtri */}
       <div
-        className="bg-white rounded-4 shadow-sm p-3 mb-4 d-flex flex-wrap gap-3 align-items-center"
-        style={{ border: "1px solid #e8f4f8" }}
+        className="rounded-4 shadow-sm p-3 mb-4 d-flex flex-wrap gap-3 align-items-center"
+        style={{ backgroundColor: "rgba(255,255,255,0.75)", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.7)" }}
       >
         <div className="d-flex align-items-center gap-2">
           <span className="small fw-bold text-muted" style={{ whiteSpace: "nowrap" }}>Intento:</span>
