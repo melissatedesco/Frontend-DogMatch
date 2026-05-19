@@ -39,11 +39,11 @@ const TypingDots = () => (
 );
 
 const SCREEN_LABELS = {
-  "/home":      "Home / Discovery (feed cani)",
-  "/messages":  "Messaggi e chat con i match",
-  "/profile":   "Profilo utente",
-  "/requests":  "Richieste di match ricevute",
-  "/admin":     "Pannello amministratore",
+  "/home": "Home / Discovery (feed cani)",
+  "/messages": "Messaggi e chat con i match",
+  "/profile": "Profilo utente",
+  "/requests": "Richieste di match ricevute",
+  "/admin": "Pannello amministratore",
 };
 
 function getCurrentScreen() {
@@ -87,7 +87,9 @@ const SnoutBot = () => {
         }));
         setMessages([WELCOME, ...storico]);
       }
-    } catch {}
+    } catch (err) {
+      console.error("Errore caricamento cronologia:", err);
+    }
     setHistoryLoaded(true);
   };
 
@@ -118,14 +120,19 @@ const SnoutBot = () => {
         body: JSON.stringify({ message: text, screen: getCurrentScreen() }),
       });
       const data = await res.json();
-      const botText = data?.data?.text || "Bau... scusa, mi sono distratto. Puoi ripetere? 🐾";
+      const botText =
+        data?.data?.text || "Bau... scusa, mi sono distratto. Puoi ripetere? 🐾";
       const botMsg = { id: Date.now() + 1, role: "bot", text: botText };
       setMessages((prev) => [...prev, botMsg]);
       if (!isChatOpen) setUnread((n) => n + 1);
     } catch {
       setMessages((prev) => [
         ...prev,
-        { id: Date.now() + 1, role: "bot", text: "Ops, qualcosa è andato storto. Riprova tra poco 🐾" },
+        {
+          id: Date.now() + 1,
+          role: "bot",
+          text: "Ops, qualcosa è andato storto. Riprova tra poco 🐾",
+        },
       ]);
     } finally {
       setIsTyping(false);
@@ -157,7 +164,11 @@ const SnoutBot = () => {
         onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.1)")}
         onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
       >
-        <img src={snoutBot} alt="SnoutBot" style={{ width: "70%", height: "70%", objectFit: "contain" }} />
+        <img
+          src={snoutBot}
+          alt="SnoutBot"
+          style={{ width: "70%", height: "70%", objectFit: "contain" }}
+        />
         {!isChatOpen && unread > 0 && (
           <div
             style={{
@@ -209,7 +220,11 @@ const SnoutBot = () => {
             style={{ backgroundColor: "#7FBCC8", flexShrink: 0 }}
           >
             <div className="d-flex align-items-center gap-2">
-              <img src={snoutBot} alt="bot" style={{ width: "32px", height: "32px", borderRadius: "50%", border: "2px solid white" }} />
+              <img
+                src={snoutBot}
+                alt="bot"
+                style={{ width: "32px", height: "32px", borderRadius: "50%", border: "2px solid white" }}
+              />
               <div>
                 <div className="text-white fw-bold small lh-1">SnoutBot</div>
                 <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.8)" }}>
@@ -234,10 +249,16 @@ const SnoutBot = () => {
             {messages.map((msg) => (
               <div
                 key={msg.id}
-                className={`d-flex mb-2 align-items-end gap-2 ${msg.role === "user" ? "justify-content-end" : "justify-content-start"}`}
+                className={`d-flex mb-2 align-items-end gap-2 ${
+                  msg.role === "user" ? "justify-content-end" : "justify-content-start"
+                }`}
               >
                 {msg.role === "bot" && (
-                  <img src={snoutBot} alt="bot" style={{ width: "24px", height: "24px", borderRadius: "50%", flexShrink: 0 }} />
+                  <img
+                    src={snoutBot}
+                    alt="bot"
+                    style={{ width: "24px", height: "24px", borderRadius: "50%", flexShrink: 0 }}
+                  />
                 )}
                 <div
                   className="p-2 px-3 rounded-4 shadow-sm small"
@@ -257,7 +278,11 @@ const SnoutBot = () => {
 
             {isTyping && (
               <div className="d-flex mb-2 align-items-end gap-2 justify-content-start">
-                <img src={snoutBot} alt="bot" style={{ width: "24px", height: "24px", borderRadius: "50%", flexShrink: 0 }} />
+                <img
+                  src={snoutBot}
+                  alt="bot"
+                  style={{ width: "24px", height: "24px", borderRadius: "50%", flexShrink: 0 }}
+                />
                 <div className="bg-white p-2 px-3 rounded-4 shadow-sm">
                   <TypingDots />
                 </div>
