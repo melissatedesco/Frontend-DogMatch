@@ -85,17 +85,23 @@ const AdminPanel = ({ onBack }) => {
     } catch { /* silent */ } finally { setDeletingId(null); }
   };
 
+  const hasPedigree = (u) => {
+    const cane = u.iMieiCani?.[0];
+    return (cane?.documenti?.length ?? 0) > 0 ||
+           !!(cane?.pedigreeUrl ?? cane?.pedigree_url);
+  };
+
   const stats = {
-    totalUtenti:   utenti.length,
-    verificati:    utenti.filter(u => u.isVerificato).length,
-    daVerificare:  utenti.filter(u => !u.isVerificato && (u.iMieiCani?.[0]?.documenti?.length ?? 0) > 0).length,
-    bloccati:      utenti.filter(u => u.isBloccato).length,
-    totalCani:     cani.length,
+    totalUtenti:  utenti.length,
+    verificati:   utenti.filter(u => u.isVerificato).length,
+    daVerificare: utenti.filter(u => !u.isVerificato && !u.isBloccato && hasPedigree(u)).length,
+    bloccati:     utenti.filter(u => u.isBloccato).length,
+    totalCani:    cani.length,
   };
 
   const filteredUtenti = utenti
     .filter(u => {
-      if (filtro === "daVerificare") return !u.isVerificato && (u.iMieiCani?.[0]?.documenti?.length ?? 0) > 0;
+      if (filtro === "daVerificare") return !u.isVerificato && !u.isBloccato && hasPedigree(u);
       if (filtro === "verificati")   return u.isVerificato;
       if (filtro === "bloccati")     return u.isBloccato;
       return true;
@@ -208,8 +214,8 @@ const AdminPanel = ({ onBack }) => {
         ) : (
           <div className="d-flex flex-column gap-2">
             {filteredUtenti.map(utente => {
-              const cane        = utente.iMieiCani?.[0];
-              const hasPedigree = !!(cane?.pedigreeUrl ?? cane?.pedigree_url);
+              const cane            = utente.iMieiCani?.[0];
+              const hasPedigree = !!(cane?.pedigreeUrl ?? cane?.pedigree_url) || (cane?.documenti?.length ?? 0) > 0;
               const borderColor = utente.isBloccato ? "#f5c6cb" : utente.isVerificato ? "#c3e6cb" : hasPedigree ? "#ffc107" : "#e9ecef";
 
               return (

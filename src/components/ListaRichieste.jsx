@@ -37,10 +37,14 @@ const MatchList = ({ matches, onSelectMatch, msgNotifiche = {}, onlineMap = {} }
                   />
                 </div>
 
-                <div className="ms-3 flex-grow-1">
+                <div className="ms-3 flex-grow-1 overflow-hidden">
                   <h6 className="mb-0 fw-bold" style={{ color: "#444" }}>{match.name}</h6>
-                  <small className="text-muted d-block">
-                    {unread > 0 ? `${unread} nuovo${unread > 1 ? 'i' : ''} messaggio${unread > 1 ? 'i' : ''}` : "Ora puoi chattare!"}
+                  <small className="text-muted d-block text-truncate" style={{ maxWidth: "160px" }}>
+                    {unread > 0
+                      ? `${unread} nuovo${unread > 1 ? 'i' : ''} messaggio${unread > 1 ? 'i' : ''}`
+                      : match.ultimoMessaggio
+                        ? match.ultimoMessaggio.testo
+                        : "Ora puoi chattare!"}
                   </small>
                 </div>
 

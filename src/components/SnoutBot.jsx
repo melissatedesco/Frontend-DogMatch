@@ -39,11 +39,11 @@ const TypingDots = () => (
 );
 
 const SCREEN_LABELS = {
-  "/home":          "Home / Discovery (feed cani)",
-  "/messages":      "Messaggi e chat con i match",
-  "/profile":       "Profilo utente",
-  "/requests":      "Richieste di match ricevute",
-  "/admin":         "Pannello amministratore",
+  "/home":      "Home / Discovery (feed cani)",
+  "/messages":  "Messaggi e chat con i match",
+  "/profile":   "Profilo utente",
+  "/requests":  "Richieste di match ricevute",
+  "/admin":     "Pannello amministratore",
 };
 
 function getCurrentScreen() {
@@ -64,20 +64,7 @@ const SnoutBot = () => {
 
   useEffect(() => {
     if (isChatOpen && !historyLoaded) {
-      fetch("/api/chat/bot/history", { headers: getAuthHeader() })
-        .then((r) => r.json())
-        .then((data) => {
-          if (data?.messaggi?.length) {
-            const storico = data.messaggi.map((m) => ({
-              id: m.id,
-              role: m.role === "assistant" ? "bot" : "user",
-              text: m.content,
-            }));
-            setMessages([WELCOME, ...storico]);
-          }
-        })
-        .catch(() => {})
-        .finally(() => setHistoryLoaded(true));
+      loadHistory();
     }
     if (isChatOpen) setUnread(0);
   }, [isChatOpen, historyLoaded]);
@@ -88,9 +75,29 @@ const SnoutBot = () => {
     }
   }, [messages, isChatOpen]);
 
+  const loadHistory = async () => {
+    try {
+      const res = await fetch(`${API_URL}/history`, { headers: getAuthHeader() });
+      const data = await res.json();
+      if (data?.messaggi?.length) {
+        const storico = data.messaggi.map((m) => ({
+          id: m.id,
+          role: m.role === "assistant" ? "bot" : "user",
+          text: m.content,
+        }));
+        setMessages([WELCOME, ...storico]);
+      }
+    } catch {}
+    setHistoryLoaded(true);
+  };
+
   const clearHistory = async () => {
     if (!window.confirm("Vuoi cancellare tutta la cronologia della chat?")) return;
-    await fetch("/api/chat/bot/history", { method: "DELETE", headers: getAuthHeader() }).catch(() => {});
+    try {
+      await fetch(`${API_URL}/history`, { method: "DELETE", headers: getAuthHeader() });
+    } catch (err) {
+      console.error("Errore cancellazione cronologia:", err);
+    }
     setMessages([WELCOME]);
     setHistoryLoaded(false);
   };
@@ -134,7 +141,6 @@ const SnoutBot = () => {
 
   return (
     <>
-      {/* Floating button */}
       <div
         className="position-fixed bottom-0 end-0 m-4 shadow-lg d-flex align-items-center justify-content-center"
         style={{
@@ -176,7 +182,6 @@ const SnoutBot = () => {
         )}
       </div>
 
-      {/* Chat window */}
       {isChatOpen && (
         <div
           className="position-fixed shadow-lg d-flex flex-column"
@@ -199,7 +204,6 @@ const SnoutBot = () => {
             }
           `}</style>
 
-          {/* Header */}
           <div
             className="p-3 d-flex align-items-center justify-content-between"
             style={{ backgroundColor: "#7FBCC8", flexShrink: 0 }}
@@ -226,7 +230,6 @@ const SnoutBot = () => {
             </div>
           </div>
 
-          {/* Messages */}
           <div className="flex-grow-1 p-3 overflow-auto" style={{ backgroundColor: "#f8fbfb" }}>
             {messages.map((msg) => (
               <div
@@ -242,6 +245,7 @@ const SnoutBot = () => {
                     maxWidth: "78%",
                     backgroundColor: msg.role === "user" ? "#7FBCC8" : "white",
                     color: msg.role === "user" ? "white" : "#1c1e21",
+                    whiteSpace: "pre-wrap",
                     wordBreak: "break-word",
                     lineHeight: "1.5",
                   }}
@@ -263,7 +267,6 @@ const SnoutBot = () => {
             <div ref={bottomRef} />
           </div>
 
-          {/* Input */}
           <div className="p-3 bg-white border-top" style={{ flexShrink: 0 }}>
             <div className="input-group input-group-sm">
               <input
