@@ -45,6 +45,26 @@ const Navbar = ({
             )}
           </a>
 
+          {/* Richieste Match */}
+          {user?.ruolo !== "admin" && (
+            <a href="#" className="text-decoration-none position-relative" title="Richieste di Match"
+              onClick={(e) => { e.preventDefault(); onNavigate("requests"); }}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="1.4rem" height="1.4rem" fill="#8A9A9D" viewBox="0 0 24 24" style={{ display: "block" }}>
+                <ellipse cx="9" cy="6" rx="2" ry="2.8"/>
+                <ellipse cx="15" cy="6" rx="2" ry="2.8"/>
+                <ellipse cx="5.5" cy="10" rx="2" ry="2.5"/>
+                <ellipse cx="18.5" cy="10" rx="2" ry="2.5"/>
+                <path d="M12 10.5c-3.6 0-6.5 2.2-6.5 4.8 0 1.2.8 1.7 1.7 1.7h9.6c.9 0 1.7-.5 1.7-1.7 0-2.6-2.9-4.8-6.5-4.8z"/>
+              </svg>
+              {notifications?.richieste > 0 && (
+                <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger border border-light"
+                  style={{ fontSize: "0.55rem" }}>
+                  {notifications.richieste}
+                </span>
+              )}
+            </a>
+          )}
+
           {/* Pannello Admin */}
           {user?.ruolo === "admin" && (
             <a href="#" className="text-decoration-none" title="Pannello Moderatore"
