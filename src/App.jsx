@@ -546,7 +546,10 @@ function App() {
           <div className="row g-3 g-lg-4">
             <div className="col-xl-9 col-lg-8">
               <Home
-                dogs={dogs} loading={loading} feedError={feedError}
+                dogs={dogs.filter(dog =>
+                  !state.matches.some(m => m.id === dog.id) &&
+                  !richieste.some(r => r.cane?.id === dog.id)
+                )} loading={loading} feedError={feedError}
                 setSelectedDog={setSelectedDog}
                 handleAcceptMatch={handleAcceptMatch} handlePlayClick={handlePlayClick}
                 user={user}
