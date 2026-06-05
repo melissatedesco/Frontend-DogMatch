@@ -146,7 +146,7 @@ const AdminHome = ({ onNavigate }) => {
               className="btn btn-sm rounded-pill fw-semibold px-3"
               style={{
                 backgroundColor: filtro === f.id ? (f.id === 'segnalati' ? '#dc3545' : '#7FBCC8') : '#f0f2f5',
-                color: filtro === f.id ? 'white' : '#555',
+                color: filtro === f.id ? (f.id === 'segnalati' ? 'white' : '#1c1e21') : '#555',
                 border: 'none',
                 fontSize: '0.8rem'
               }}

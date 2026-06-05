@@ -171,7 +171,7 @@ const AdminPanel = ({ onBack }) => {
             onClick={() => { setVista(t.id); setSearch(""); setFiltro("tutti"); }}
             style={{
               backgroundColor: vista === t.id ? "#7FBCC8" : "#f0f2f5",
-              color: vista === t.id ? "white" : "#555",
+              color: vista === t.id ? "#1c1e21" : "#555",
               border: "none",
               fontSize: "0.85rem"
             }}>
